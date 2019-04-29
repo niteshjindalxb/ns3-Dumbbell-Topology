@@ -1,95 +1,31 @@
-/*
-Application Detail:
-Analyse and compare TCP Reno, TCP Westwood, and TCP Fack (i.e. Reno TCP with "forward
-acknowledgment") performance. Select a Dumbbell topology with two routers R1 and R2 connected by a
-(10 Mbps, 50 ms) wired link. Each of the routers is connected to 3 hosts i.e., H1 to H3 (i.e. senders) are
-connected to R1 and H4 to H6 (i.e. receivers) are connected to R2. The hosts are attached with (100 Mbps,
-20ms) links. Both the routers use drop-tail queues with queue size set according to bandwidth-delay product.
-Senders (i.e. H1, H2 and H3) are attached with TCP Reno, TCP Westwood, and TCP Fack agents respectively.
-Choose a packet size of 1.2KB and perform the following task. Make appropriate assumptions wherever
-necessary.
-a. Start only one flow and analyse the throughput over sufficiently long duration. Mention how do you
-select the duration. Plot of evolution of congestion window over time. Perform this experiment
-with flows attached to all the three sending agents.
-b. Next, start 2 other flows sharing the bottleneck while the first one is in progress and measure the
-throughput (in Kbps) of each flow. Plot the throughput and congestion window of each flow at
-steady-state. What is the maximum throughput of each flow? 
-c. Measure the congestion loss and goodput over the duration of the experiment for each flow. 
-Implementation detail:
-		 _								_
-		|	H1------+		+------H4	 |
-		|			|		|			 |
-Senders	|	H2------R1------R2-----H5	 |	Receivers
-		|			|		|			 |
-		|_	H3------+		+------H6	_|
-	Representation in code:
-	H1(n0), H2(n1), H3(n2), H4(n3), H5(n4), H6(n5), R1(n6), R2(n7) :: n stands for node
-	Dumbbell topology is used with 
-	H1, H2, H3 on left side of dumbbell,
-	H4, H5, H6 on right side of dumbbell,
-	and routers R1 and R2 form the bridge of dumbbell.
-	H1 is attached with TCP Reno agent.
-	H2 is attached with TCP Westfood agent.
-	H3 is attached with TCP Fack agent.
-	Links:
-	H1R1/H2R1/H3R1/H4R2/H5R2/H6R2: P2P with 100Mbps and 20ms.
-	R1R2: (dumbbell bridge) P2P with 10Mbps and 50ms.
-	packet size: 1.2KB.
-	Number of packets decided by Bandwidth delay product:
-	i.e. #packets = Bandwidth*Delay(in bits)
-	Therefore, max #packets (HiRj) = 100Mbps*20ms = 2000000
-	and max #packets (R1R2) = 10Mbps*50ms = 500000
-*/
 #include "header.h"
 
 int main() 
 {
 	std::cout << "* PART-2 AND PART-3 STARTED *" << std::endl;
-	std::string rateHR = "100Mbps";
-	std::string latencyHR = "20ms";
-	std::string rateRR = "10Mbps";
-	std::string latencyRR = "50ms";
-
-	uint packetSize = 1.3*1024;		//1.2KB
-	uint queueSizeHR = (100000*20)/packetSize;
-	// uint queueSizeHR = 0;
-	uint queueSizeRR = (10000*50)/packetSize;
-	// uint queueSizeRR = 0;
-
-	std::string valueHR = std::to_string(queueSizeHR)+"p";
-	std::string valueRR = std::to_string(queueSizeRR)+"p";
-
-	uint numSender = 3;
-
-	double errorP = ERROR;
-
-
-	// Config::Set("ns3::DropTailQueue::Mode", StringValue("QUEUE_MODE_PACKETS"));
-    /*
-    Config::SetDefault("ns3::DropTailQueue::MaxPackets", UintegerValue(queuesize));
-	*/
+	TopologyParam params;
 
 	//Creating channel without IP address
 	std::cout << "Creating channel without IP address" << std::endl;
-	PointToPointHelper p2pHR = configureP2PHelper(rateHR, latencyHR, valueHR);
-	PointToPointHelper p2pRR = configureP2PHelper(rateRR, latencyRR, valueRR);;
+	PointToPointHelper p2pHR = configureP2PHelper(params.rateHR, params.latencyHR, std::to_string(params.queueSizeHR)+"p");
+	PointToPointHelper p2pRR = configureP2PHelper(params.rateRR, params.latencyRR, std::to_string(params.queueSizeRR)+"p");
 	
 	//Adding some errorrate
 	std::cout << "Adding some errorrate" << std::endl;
-	Ptr<RateErrorModel> em = CreateObjectWithAttributes<RateErrorModel> ("ErrorRate", DoubleValue (errorP));
+	Ptr<RateErrorModel> em = CreateObjectWithAttributes<RateErrorModel> ("ErrorRate", DoubleValue (params.errorParam));
 
 	NodeContainer routers, senders, receivers;
-	routers.Create(2);
-	senders.Create(numSender);
-	receivers.Create(numSender);
+	routers.Create(params.numRouters);
+	senders.Create(params.numSender);
+	receivers.Create(params.numRecv);
 
 	NetDeviceContainer routerDevices = p2pRR.Install(routers);
 	NetDeviceContainer leftRouterDevices, rightRouterDevices, senderDevices, receiverDevices;
 
 	//Adding links
 	std::cout << "Adding links...";
-	uint i=0;
-	while(i<numSender)
+	int i=0;
+	while(i<params.numSender)
 	{
 		NetDeviceContainer cleft = p2pHR.Install(routers.Get(0), senders.Get(i));
 		leftRouterDevices.Add(cleft.Get(0));
@@ -99,7 +35,7 @@ int main()
 	}
 
 	i=0;
-	while(i<numSender)
+	while(i<params.numSender)
 	{
 		NetDeviceContainer cright = p2pHR.Install(routers.Get(1), receivers.Get(i));
 		rightRouterDevices.Add(cright.Get(0));
@@ -127,7 +63,7 @@ int main()
 
 	routerIFC = routerIP.Assign(routerDevices);
 
-	for(uint i = 0; i < numSender; ++i) {
+	for(int i = 0; i < params.numSender; ++i) {
 		NetDeviceContainer senderDevice;
 		senderDevice.Add(senderDevices.Get(i));
 		senderDevice.Add(leftRouterDevices.Get(i));
@@ -156,8 +92,8 @@ int main()
 	double durationGap = 100;
 	double oneFlowStart = 0;
 	double otherFlowStart = 20;
-	uint port = 9000;
-	uint numPackets = 10000000;
+	int port = 9000;
+	int numPackets = 10000000;
 	std::string transferSpeed = "400Mbps";
 		
 	
