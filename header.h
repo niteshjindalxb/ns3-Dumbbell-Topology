@@ -19,7 +19,7 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("App6");
 
-class APP: public Application {
+class DumbbellTopology: public Application {
 	private:
 		virtual void StartApplication(void);
 		virtual void StopApplication(void);
@@ -37,8 +37,8 @@ class APP: public Application {
 		uint32_t        mPacketsSent;
 
 	public:
-		APP();
-		virtual ~APP();
+		DumbbellTopology();
+		virtual ~DumbbellTopology();
 
 		void Setup(Ptr<Socket> socket, Address address, uint packetSize, uint nPackets, DataRate dataRate);
 		void ChangeRate(DataRate newRate);
@@ -46,7 +46,7 @@ class APP: public Application {
 
 };
 
-APP::APP(): mSocket(0),
+DumbbellTopology::DumbbellTopology(): mSocket(0),
 		    mPeer(),
 		    mPacketSize(0),
 		    mNPackets(0),
@@ -56,11 +56,11 @@ APP::APP(): mSocket(0),
 		    mPacketsSent(0) {
 }
 
-APP::~APP() {
+DumbbellTopology::~DumbbellTopology() {
 	mSocket = 0;
 }
 
-void APP::Setup(Ptr<Socket> socket, Address address, uint packetSize, uint nPackets, DataRate dataRate) {
+void DumbbellTopology::Setup(Ptr<Socket> socket, Address address, uint packetSize, uint nPackets, DataRate dataRate) {
 	mSocket = socket;
 	mPeer = address;
 	mPacketSize = packetSize;
@@ -68,7 +68,7 @@ void APP::Setup(Ptr<Socket> socket, Address address, uint packetSize, uint nPack
 	mDataRate = dataRate;
 }
 
-void APP::StartApplication() {
+void DumbbellTopology::StartApplication() {
 	mRunning = true;
 	mPacketsSent = 0;
 	mSocket->Bind();
@@ -76,7 +76,7 @@ void APP::StartApplication() {
 	SendPacket();
 }
 
-void APP::StopApplication() {
+void DumbbellTopology::StopApplication() {
 	mRunning = false;
 	if(mSendEvent.IsRunning()) {
 		Simulator::Cancel(mSendEvent);
@@ -86,7 +86,7 @@ void APP::StopApplication() {
 	}
 }
 
-void APP::SendPacket() {
+void DumbbellTopology::SendPacket() {
 	Ptr<Packet> packet = Create<Packet>(mPacketSize);
 	mSocket->Send(packet);
 
@@ -95,17 +95,17 @@ void APP::SendPacket() {
 	}
 }
 
-void APP::ScheduleTx() {
+void DumbbellTopology::ScheduleTx() {
 	if (mRunning) {
 		Time tNext(Seconds(mPacketSize*8/static_cast<double>(mDataRate.GetBitRate())));
-		mSendEvent = Simulator::Schedule(tNext, &APP::SendPacket, this);
+		mSendEvent = Simulator::Schedule(tNext, &DumbbellTopology::SendPacket, this);
 		//double tVal = Simulator::Now().GetSeconds();
 		//if(tVal-int(tVal) >= 0.99)
 		//	std::cout << Simulator::Now ().GetSeconds () << "\t" << mPacketsSent << std::endl;
 	}
 }
 
-void APP::ChangeRate(DataRate newrate) {
+void DumbbellTopology::ChangeRate(DataRate newrate) {
 	mDataRate = newrate;
 	return;
 }
@@ -134,7 +134,7 @@ static void packetDrop(Ptr<OutputStreamWrapper> stream, double startTime, uint m
 }
 
 
-void IncRate(Ptr<APP> app, DataRate rate) {
+void IncRate(Ptr<DumbbellTopology> app, DataRate rate) {
 	app->ChangeRate(rate);
 	return;
 }
@@ -208,7 +208,7 @@ Ptr<Socket> Simulate(Address sinkAddress,
 	Ptr<Socket> ns3TcpSocket = Socket::CreateSocket(hostNode, TcpSocketFactory::GetTypeId());
 	
 
-	Ptr<APP> app = CreateObject<APP>();
+	Ptr<DumbbellTopology> app = CreateObject<DumbbellTopology>();
 	app->Setup(ns3TcpSocket, sinkAddress, packetSize, numPackets, DataRate(dataRate));
 	hostNode->AddApplication(app);
 	app->SetStartTime(Seconds(appStartTime));
