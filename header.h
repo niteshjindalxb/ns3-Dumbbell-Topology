@@ -120,86 +120,98 @@ PointToPointHelper configureP2PHelper(std::string rate, std::string latency, std
 	return p2p;
 }
 
-static void CwndChange(Ptr<OutputStreamWrapper> stream, double startTime, uint oldCwnd, uint newCwnd) {
-	*stream->GetStream() << Simulator::Now ().GetSeconds () - startTime << "\t" << newCwnd << std::endl;
+static void CwndChange(Ptr<OutputStreamWrapper> file, double startTime, uint oldCwnd, uint newCwnd) {
+	*file->GetStream() << Simulator::Now ().GetSeconds () - startTime << "\t" << newCwnd << std::endl;
 }
 
 std::map<uint, uint> mapDrop;
-static void packetDrop(Ptr<OutputStreamWrapper> stream, double startTime, uint myId) {
-	*stream->GetStream() << Simulator::Now ().GetSeconds () - startTime << "\t" << std::endl;
-	if(mapDrop.find(myId) == mapDrop.end()) {
-		mapDrop[myId] = 0;
+
+static void packetDrop(Ptr<OutputStreamWrapper> file, double startTime, uint packetId) 
+{
+	*file->GetStream() << Simulator::Now ().GetSeconds () - startTime << "\t" << std::endl;
+	
+	if(mapDrop.find(packetId) == mapDrop.end()) {
+		mapDrop[packetId] = 0;
 	}
-	mapDrop[myId]++;
+	mapDrop[packetId]++;
 }
 
-
-void IncRate(Ptr<DumbbellTopology> app, DataRate rate) {
-	app->ChangeRate(rate);
-	return;
-}
-
-std::map<Address, double> mapBytesReceived;
-std::map<std::string, double> mapBytesReceivedIPV4, mapMaxThroughput;
+std::map<Address, double> recvbytes;
+std::map<std::string, double> ipv4bytes, mapMaxThroughput;
 
 static double lastTimePrint = 0, lastTimePrintIPV4 = 0;
 double printGap = 0;
 
-void ReceivedPacket(Ptr<OutputStreamWrapper> stream, double startTime, std::string context, Ptr<const Packet> p, const Address& addr){
+void recvpacket(Ptr<OutputStreamWrapper> file, double startTime, std::string context, 
+Ptr<const Packet> p, const Address& addr)
+{
 	double timeNow = Simulator::Now().GetSeconds();
 
-	if(mapBytesReceived.find(addr) == mapBytesReceived.end())
-		mapBytesReceived[addr] = 0;
-	mapBytesReceived[addr] += p->GetSize();
-	double kbps_ = (((mapBytesReceived[addr] * 8.0) / 1024)/(timeNow-startTime));
-	if(timeNow - lastTimePrint >= printGap) {
+	if(recvbytes.find(addr) == recvbytes.end())
+		recvbytes[addr] = 0;
+
+	recvbytes[addr] += p->GetSize();
+
+	double kbps_ = (((recvbytes[addr] * 8.0)/1024)/(timeNow-startTime));
+
+	if(timeNow - lastTimePrint >= printGap) 
+	{
 		lastTimePrint = timeNow;
-		*stream->GetStream() << timeNow-startTime << "\t" <<  kbps_ << std::endl;
+		*file->GetStream() << timeNow-startTime << "\t" <<  kbps_ << std::endl;
 	}
 }
 
-void ReceivedPacketIPV4(Ptr<OutputStreamWrapper> stream, double startTime, std::string context, Ptr<const Packet> p, Ptr<Ipv4> ipv4, uint interface) {
+void recvpacketv4(Ptr<OutputStreamWrapper> file, double startTime, 
+std::string context, Ptr<const Packet> p, Ptr<Ipv4> ipv4, uint interface) 
+{
 	double timeNow = Simulator::Now().GetSeconds();
-
-	if(mapBytesReceivedIPV4.find(context) == mapBytesReceivedIPV4.end())
-		mapBytesReceivedIPV4[context] = 0;
+	
+	if(ipv4bytes.find(context) == ipv4bytes.end())
+		ipv4bytes[context] = 0;
+	
 	if(mapMaxThroughput.find(context) == mapMaxThroughput.end())
 		mapMaxThroughput[context] = 0;
-	mapBytesReceivedIPV4[context] += p->GetSize();
-	double kbps_ = (((mapBytesReceivedIPV4[context] * 8.0) / 1024)/(timeNow-startTime));
-	if(timeNow - lastTimePrintIPV4 >= printGap) {
+	
+	ipv4bytes[context] += p->GetSize();
+	
+	double kbps_ = (((ipv4bytes[context] * 8.0) / 1024)/(timeNow-startTime));
+	
+	if(timeNow - lastTimePrintIPV4 >= printGap)
+	{
 		lastTimePrintIPV4 = timeNow;
-		*stream->GetStream() << timeNow-startTime << "\t" <<  kbps_ << std::endl;
+		*file->GetStream() << timeNow-startTime << "\t" <<  kbps_ << std::endl;
+		
 		if(mapMaxThroughput[context] < kbps_)
+		{
 			mapMaxThroughput[context] = kbps_;
+		}
 	}
 }
 
 
-Ptr<Socket> Simulate(Address sinkAddress, 
-					uint sinkPort, 
-					std::string tcpVariant, 
-					Ptr<Node> hostNode, 
-					Ptr<Node> sinkNode, 
-					double startTime, 
-					double stopTime,
-					uint packetSize,
-					uint numPackets,
-					std::string dataRate,
-					double appStartTime,
-					double appStopTime) {
-
-	if(tcpVariant.compare("TcpHybla") == 0) {
+Ptr<Socket> Simulate(Address sinkAddress, uint sinkPort, std::string type, Ptr<Node> hostNode, 
+Ptr<Node> sinkNode, double startTime, double stopTime,uint packetSize,uint numPackets,
+std::string dataRate,double appStartTime,double appStopTime) 
+{
+	if(type == "TcpHybla") 
+	{
 		Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpHybla::GetTypeId()));
-	} else if(tcpVariant.compare("TcpWestwood") == 0) {
+	} 
+	else if(type == "TcpWestwoodPlus") 
+	{
 		Config::SetDefault ("ns3::TcpWestwood::ProtocolType", EnumValue (TcpWestwood::WESTWOODPLUS));
 		Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpWestwood::GetTypeId()));
-	} else if(tcpVariant.compare("TcpYeah") == 0) {
+	} 
+	else if(type == "TcpYeah") 
+	{
 		Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpYeah::GetTypeId()));
-	} else {
+	} 
+	else 
+	{
 		fprintf(stderr, "Invalid TCP version\n");
 		exit(EXIT_FAILURE);
 	}
+
 	PacketSinkHelper packetSinkHelper("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), sinkPort));
 	ApplicationContainer sinkApps = packetSinkHelper.Install(sinkNode);
 	sinkApps.Start(Seconds(startTime));

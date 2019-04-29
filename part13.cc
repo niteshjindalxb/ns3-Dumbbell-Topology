@@ -60,9 +60,9 @@ int main()
 
 	//Adding IP addresses
 	std::cout << "Assigning IP addresses...";
-	Ipv4AddressHelper routerIP = Ipv4AddressHelper("10.3.0.0", "255.255.255.0");	//(network, mask)
-	Ipv4AddressHelper senderIP = Ipv4AddressHelper("10.1.0.0", "255.255.255.0");
-	Ipv4AddressHelper receiverIP = Ipv4AddressHelper("10.2.0.0", "255.255.255.0");
+	Ipv4AddressHelper routerIP = Ipv4AddressHelper("172.15.0.0", "255.255.255.0");	//(network, mask)
+	Ipv4AddressHelper senderIP = Ipv4AddressHelper("172.16.0.0", "255.255.255.0");
+	Ipv4AddressHelper receiverIP = Ipv4AddressHelper("172.17.0.0", "255.255.255.0");
 
 	Ipv4InterfaceContainer routerIFC, senderIFCs, receiverIFCs, leftRouterIFCs, rightRouterIFCs;
 
@@ -111,7 +111,7 @@ int main()
 	double durationGap = 100;
 	double netDuration = 0;
 	int port = 9000;
-	int numPackets = 10000000;
+	int numPackets = 20000000;
 	std::string transferSpeed = "400Mbps";	
 
 	//TCP Reno from H1 to H4
@@ -127,28 +127,28 @@ int main()
 
 	// Measure PacketSinks
 	std::string sink = "/NodeList/5/ApplicationList/0/$ns3::PacketSink/Rx";
-	Config::Connect(sink, MakeBoundCallback(&ReceivedPacket, h1gp, netDuration));
+	Config::Connect(sink, MakeBoundCallback(&recvpacket, h1gp, netDuration));
 
 	std::string sink_ = "/NodeList/5/$ns3::Ipv4L3Protocol/Rx";
-	Config::Connect(sink_, MakeBoundCallback(&ReceivedPacketIPV4, h1tp, netDuration));
+	Config::Connect(sink_, MakeBoundCallback(&recvpacketv4, h1tp, netDuration));
 
 	netDuration += durationGap;
 
 
 	//TCP Westwood from H2 to H5
-	std::cout<<"** TCP Westwood from H2 to H5 **"<<std::endl;
+	std::cout<<"** TCP WestwoodPlus from H2 to H5 **"<<std::endl;
 	Ptr<OutputStreamWrapper> h2cw = asciiTraceHelper.CreateFileStream("PartA/data_westwood_a.cw");
 	Ptr<OutputStreamWrapper> h2cl = asciiTraceHelper.CreateFileStream("PartA/westwood_a.cl");
 	Ptr<OutputStreamWrapper> h2tp = asciiTraceHelper.CreateFileStream("PartA/data_westwood_a.tp");
 	Ptr<OutputStreamWrapper> h2gp = asciiTraceHelper.CreateFileStream("PartA/data_westwood_a.gp");
-	Ptr<Socket> ns3TcpSocket2 = Simulate(InetSocketAddress(receiverIFCs.GetAddress(1), port), port, "TcpWestwood", senders.Get(1), receivers.Get(1), netDuration, netDuration+durationGap, params.packetSize, numPackets, transferSpeed, netDuration, netDuration+durationGap);
+	Ptr<Socket> ns3TcpSocket2 = Simulate(InetSocketAddress(receiverIFCs.GetAddress(1), port), port, "TcpWestwoodPlus", senders.Get(1), receivers.Get(1), netDuration, netDuration+durationGap, params.packetSize, numPackets, transferSpeed, netDuration, netDuration+durationGap);
 	ns3TcpSocket2->TraceConnectWithoutContext("CongestionWindow", MakeBoundCallback (&CwndChange, h2cw, netDuration));
 	ns3TcpSocket2->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h2cl, netDuration, 2));
 
 	sink = "/NodeList/6/ApplicationList/0/$ns3::PacketSink/Rx";
-	Config::Connect(sink, MakeBoundCallback(&ReceivedPacket, h2gp, netDuration));
+	Config::Connect(sink, MakeBoundCallback(&recvpacket, h2gp, netDuration));
 	sink_ = "/NodeList/6/$ns3::Ipv4L3Protocol/Rx";
-	Config::Connect(sink_, MakeBoundCallback(&ReceivedPacketIPV4, h2tp, netDuration));
+	Config::Connect(sink_, MakeBoundCallback(&recvpacketv4, h2tp, netDuration));
 	netDuration += durationGap;
 
 	//TCP Fack from H3 to H6
@@ -162,9 +162,9 @@ int main()
 	ns3TcpSocket3->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h3cl, netDuration, 3));
 
 	sink = "/NodeList/7/ApplicationList/0/$ns3::PacketSink/Rx";
-	Config::Connect(sink, MakeBoundCallback(&ReceivedPacket, h3gp, netDuration));
+	Config::Connect(sink, MakeBoundCallback(&recvpacket, h3gp, netDuration));
 	sink_ = "/NodeList/7/$ns3::Ipv4L3Protocol/Rx";
-	Config::Connect(sink_, MakeBoundCallback(&ReceivedPacketIPV4, h3tp, netDuration));
+	Config::Connect(sink_, MakeBoundCallback(&recvpacketv4, h3tp, netDuration));
 	netDuration += durationGap;
 
 	//p2pHR.EnablePcapAll("application_6__a");
@@ -192,6 +192,7 @@ int main()
 	//Ptr<OutputStreamWrapper> streamTP = asciiTraceHelper.CreateFileStream("application_6_a.tp");
 	Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(flowmonHelper.GetClassifier());
 	std::map<FlowId, FlowMonitor::FlowStats> stats = flowmon->GetFlowStats();
+
 	for (std::map<FlowId, FlowMonitor::FlowStats>::const_iterator i = stats.begin(); i != stats.end(); ++i) {
 		Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow (i->first);
 		/*
@@ -201,7 +202,7 @@ int main()
 		*streamTP->GetStream()  << "  Time        " << i->second.timeLastRxPacket.GetSeconds() - i->second.timeFirstTxPacket.GetSeconds() << "\n";
 		*streamTP->GetStream()  << "  Throughput: " << i->second.rxBytes * 8.0 / (i->second.timeLastRxPacket.GetSeconds() - i->second.timeFirstTxPacket.GetSeconds())/1024/1024  << " Mbps\n";	
 		*/
-		if(t.sourceAddress == "10.1.0.1") {
+		if(t.sourceAddress == "172.16.0.1") {
 			if(mapDrop.find(1)==mapDrop.end())
 				mapDrop[1] = 0;
 			*h1cl->GetStream() << "TcpHybla Flow " << i->first  << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
@@ -209,7 +210,7 @@ int main()
 			*h1cl->GetStream()  << "Packet Lost due to buffer overflow: " << mapDrop[1] << "\n";
 			*h1cl->GetStream()  << "Packet Lost due to Congestion: " << i->second.lostPackets - mapDrop[1] << "\n";
 			*h1cl->GetStream() << "Max throughput: " << mapMaxThroughput["/NodeList/5/$ns3::Ipv4L3Protocol/Rx"] << std::endl;
-		} else if(t.sourceAddress == "10.1.1.1") {
+		} else if(t.sourceAddress == "172.16.1.1") {
 			if(mapDrop.find(2)==mapDrop.end())
 				mapDrop[2] = 0;
 			*h2cl->GetStream() << "Tcp Westwood Flow " << i->first  << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
@@ -217,7 +218,7 @@ int main()
 			*h2cl->GetStream()  << "Packet Lost due to buffer overflow: " << mapDrop[2] << "\n";
 			*h2cl->GetStream()  << "Packet Lost due to Congestion: " << i->second.lostPackets - mapDrop[2] << "\n";
 			*h2cl->GetStream() << "Max throughput: " << mapMaxThroughput["/NodeList/6/$ns3::Ipv4L3Protocol/Rx"] << std::endl;
-		} else if(t.sourceAddress == "10.1.2.1") {
+		} else if(t.sourceAddress == "172.16.2.1") {
 			if(mapDrop.find(3)==mapDrop.end())
 				mapDrop[3] = 0;
 			*h3cl->GetStream() << "Tcp Fack Flow " << i->first  << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
