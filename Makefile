@@ -1,31 +1,30 @@
-# Makefile wrapper for waf
+WAF = ./waf
 
 all:
-	./waf
+	$(WAF)
 
-# free free to change this part to suit your requirements
 configure:
-	./waf configure --enable-examples --enable-tests
+	$(WAF) configure --enable-examples --enable-tests
 
 build:
-	./waf build
+	$(WAF) build
 
 install:
-	./waf install
+	$(WAF) install
 
 clean:
-	./waf clean
+	$(WAF) clean
 
 distclean:
-	./waf distclean
+	$(WAF) distclean
 
-data: parta partb
+data: singleFlow multiFlow
 
-parta:
-	./waf --run scratch/part13
+singleFlow:
+	$(WAF) --run scratch/singleFlow
 	
-partb:
-	./waf --run scratch/part23
+multiFlow:
+	$(WAF) --run scratch/multiFlow
 
 graph: grapha graphb
 
