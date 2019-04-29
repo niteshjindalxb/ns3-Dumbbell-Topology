@@ -3,30 +3,18 @@
 int main() 
 {
 	std::cout << "* PART-1 AND PART-3 STARTED *" << std::endl;
-	std::string rateHR = "100Mbps";
-	std::string latencyHR = "20ms";
-	std::string rateRR = "10Mbps";
-	std::string latencyRR = "50ms";
-
-	uint packetSize = 1.2*1024;		//1.2KB
-	uint queueSizeHR = (100000*20)/packetSize;
-	uint queueSizeRR = (10000*50)/packetSize;
-
-	std::string valueHR = std::to_string(queueSizeHR)+"p";
-	std::string valueRR = std::to_string(queueSizeRR)+"p";
-	uint numSender = 3;
-	double errorP = ERROR;
-
-	PointToPointHelper p2pHR = configureP2PHelper(rateHR, latencyHR, valueHR);
-	PointToPointHelper p2pRR = configureP2PHelper(rateRR, latencyRR, valueRR);;
-	Ptr<RateErrorModel> em = CreateObjectWithAttributes<RateErrorModel> ("ErrorRate", DoubleValue (errorP));
+	TopologyParam params;
+	
+	PointToPointHelper p2pHR = configureP2PHelper(params.rateHR, params.latencyHR, std::to_string(params.queueSizeHR)+"p");
+	PointToPointHelper p2pRR = configureP2PHelper(params.rateRR, params.latencyRR, std::to_string(params.queueSizeRR)+"p");
+	Ptr<RateErrorModel> errorModel = CreateObjectWithAttributes<RateErrorModel> ("ErrorRate", DoubleValue (params.errorParam));
 
 	//Empty node containers
 	NodeContainer routers, senders, receivers;
 	//Create n nodes and append pointers to them to the end of this NodeContainer. 
-	routers.Create(2);
-	senders.Create(numSender);
-	receivers.Create(numSender);
+	routers.Create(params.numRouters);
+	senders.Create(params.numSender);
+	receivers.Create(params.numRecv);
 
 	NetDeviceContainer routerDevices = p2pRR.Install(routers);
 	
@@ -36,23 +24,23 @@ int main()
 	//Adding links
 	std::cout << "Adding links...";
 
-	uint i = 0;
-	while(i< numSender)
+	int i = 0;
+	while(i< params.numSender)
 	{
 		NetDeviceContainer cleft = p2pHR.Install(routers.Get(0), senders.Get(i));
 		leftRouterDevices.Add(cleft.Get(0));
 		senderDevices.Add(cleft.Get(1));
-		cleft.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(em));
+		cleft.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(errorModel));
 		i++;
 	}
 
 	i=0;
-	while(i< numSender)
+	while(i< params.numSender)
 	{
 		NetDeviceContainer cright = p2pHR.Install(routers.Get(1), receivers.Get(i));
 		rightRouterDevices.Add(cright.Get(0));
 		receiverDevices.Add(cright.Get(1));
-		cright.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(em));
+		cright.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(errorModel));
 		i++;
 	}
 
@@ -82,7 +70,7 @@ int main()
 	//based on the current network prefix and address base
 	routerIFC = routerIP.Assign(routerDevices);
 
-	for(uint i = 0; i < numSender; ++i) 
+	for(int i = 0; i < params.numSender; ++i) 
 	{
 		NetDeviceContainer senderDevice;
 		senderDevice.Add(senderDevices.Get(i));
@@ -122,8 +110,8 @@ int main()
 	********************************************************************/
 	double durationGap = 100;
 	double netDuration = 0;
-	uint port = 9000;
-	uint numPackets = 10000000;
+	int port = 9000;
+	int numPackets = 10000000;
 	std::string transferSpeed = "400Mbps";	
 
 	//TCP Reno from H1 to H4
@@ -133,7 +121,7 @@ int main()
 	Ptr<OutputStreamWrapper> h1cl = asciiTraceHelper.CreateFileStream("PartA/hybla_a.cl");
 	Ptr<OutputStreamWrapper> h1tp = asciiTraceHelper.CreateFileStream("PartA/data_hybla_a.tp");
 	Ptr<OutputStreamWrapper> h1gp = asciiTraceHelper.CreateFileStream("PartA/data_hybla_a.gp");
-	Ptr<Socket> ns3TcpSocket1 = uniFlow(InetSocketAddress(receiverIFCs.GetAddress(0), port), port, "TcpHybla", senders.Get(0), receivers.Get(0), netDuration, netDuration+durationGap, packetSize, numPackets, transferSpeed, netDuration, netDuration+durationGap);
+	Ptr<Socket> ns3TcpSocket1 = uniFlow(InetSocketAddress(receiverIFCs.GetAddress(0), port), port, "TcpHybla", senders.Get(0), receivers.Get(0), netDuration, netDuration+durationGap, params.packetSize, numPackets, transferSpeed, netDuration, netDuration+durationGap);
 	ns3TcpSocket1->TraceConnectWithoutContext("CongestionWindow", MakeBoundCallback (&CwndChange, h1cw, netDuration));
 	ns3TcpSocket1->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h1cl, netDuration, 1));
 
@@ -153,7 +141,7 @@ int main()
 	Ptr<OutputStreamWrapper> h2cl = asciiTraceHelper.CreateFileStream("PartA/westwood_a.cl");
 	Ptr<OutputStreamWrapper> h2tp = asciiTraceHelper.CreateFileStream("PartA/data_westwood_a.tp");
 	Ptr<OutputStreamWrapper> h2gp = asciiTraceHelper.CreateFileStream("PartA/data_westwood_a.gp");
-	Ptr<Socket> ns3TcpSocket2 = uniFlow(InetSocketAddress(receiverIFCs.GetAddress(1), port), port, "TcpWestwood", senders.Get(1), receivers.Get(1), netDuration, netDuration+durationGap, packetSize, numPackets, transferSpeed, netDuration, netDuration+durationGap);
+	Ptr<Socket> ns3TcpSocket2 = uniFlow(InetSocketAddress(receiverIFCs.GetAddress(1), port), port, "TcpWestwood", senders.Get(1), receivers.Get(1), netDuration, netDuration+durationGap, params.packetSize, numPackets, transferSpeed, netDuration, netDuration+durationGap);
 	ns3TcpSocket2->TraceConnectWithoutContext("CongestionWindow", MakeBoundCallback (&CwndChange, h2cw, netDuration));
 	ns3TcpSocket2->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h2cl, netDuration, 2));
 
@@ -169,7 +157,7 @@ int main()
 	Ptr<OutputStreamWrapper> h3cl = asciiTraceHelper.CreateFileStream("PartA/yeah_a.cl");
 	Ptr<OutputStreamWrapper> h3tp = asciiTraceHelper.CreateFileStream("PartA/data_yeah_a.tp");
 	Ptr<OutputStreamWrapper> h3gp = asciiTraceHelper.CreateFileStream("PartA/data_yeah_a.gp");
-	Ptr<Socket> ns3TcpSocket3 = uniFlow(InetSocketAddress(receiverIFCs.GetAddress(2), port), port, "TcpYeah", senders.Get(2), receivers.Get(2), netDuration, netDuration+durationGap, packetSize, numPackets, transferSpeed, netDuration, netDuration+durationGap);
+	Ptr<Socket> ns3TcpSocket3 = uniFlow(InetSocketAddress(receiverIFCs.GetAddress(2), port), port, "TcpYeah", senders.Get(2), receivers.Get(2), netDuration, netDuration+durationGap, params.packetSize, numPackets, transferSpeed, netDuration, netDuration+durationGap);
 	ns3TcpSocket3->TraceConnectWithoutContext("CongestionWindow", MakeBoundCallback (&CwndChange, h3cw, netDuration));
 	ns3TcpSocket3->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h3cl, netDuration, 3));
 

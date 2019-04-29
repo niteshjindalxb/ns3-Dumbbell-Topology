@@ -215,3 +215,40 @@ Ptr<Socket> uniFlow(Address sinkAddress,
 
 	return ns3TcpSocket;
 }
+
+struct TopologyParam
+{
+	std::string rateHR;
+	std::string latencyHR;
+	std::string rateRR;
+	std::string latencyRR;
+
+	int packetSize;
+	int queueSizeHR;
+	int queueSizeRR;
+
+	int numSender;
+	int numRecv;
+	int numRouters;
+
+	double errorParam;
+
+	TopologyParam();
+};
+
+TopologyParam::TopologyParam() {
+	this -> rateHR = "100Mbps";
+	this -> latencyHR = "20ms";
+	this -> rateRR = "10Mbps";
+	this -> latencyRR = "50ms";
+
+	this -> packetSize = 1.3*1024;		// 1.3KB
+	this -> queueSizeHR = (100*1000*20)/this->packetSize;	// #packets_queue_HR = (100Mbps)*(20ms)/packetSize
+	this -> queueSizeRR = (10*1000*50)/this->packetSize;	// #packets_queue_RR = (10Mbps)*(50ms)/packetSize
+
+	this -> numSender = 3;
+	this -> numRecv = 3;
+	this -> numRouters = 2;
+
+	this -> errorParam = ERROR;
+}
