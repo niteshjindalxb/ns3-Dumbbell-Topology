@@ -1,86 +1,150 @@
 #include "header.h"
 
+struct ExperimentParameters
+{
+	std::string rateHR;
+	std::string latencyHR;
+	std::string rateRR;
+	std::string latencyRR;
+
+	int packetSize;
+	int queueSizeHR;
+	int queueSizeRR;
+
+	int numSender;
+	int numReceiver;
+	int numRouters;
+
+	double errorParam;
+
+	ExperimentParameters() {
+		this -> rateHR = "100Mbps";
+		this -> latencyHR = "20ms";
+		this -> rateRR = "10Mbps";
+		this -> latencyRR = "50ms";
+
+		this -> packetSize = 1.3*1024;		// 1.3KB
+		this -> queueSizeHR = (100*1000*20)/this->packetSize;	// #packets_queue_HR = (100Mbps)*(20ms)/packetSize
+		this -> queueSizeRR = (10*1000*50)/this->packetSize;	// #packets_queue_RR = (10Mbps)*(50ms)/packetSize
+
+		this -> numSender = 3;
+		this -> numReceiver = 3;
+		this -> numRouters = 2;
+
+		this -> errorParam = ERROR;
+	}
+};
+
+
+/* Connects a router to hosts passed in a NodeContainer, and fills in passed NetDeviceContainers with connected network devices. */
+void connectRouterToHosts(Ptr<Node> Router, NodeContainer& Hosts, PointToPointHelper& p2p, NetDeviceContainer& RouterDevices, NetDeviceContainer& HostDevices){
+    for(uint i = 0; i < Hosts.GetN(); ++i){
+        Ptr<Node> host = Hosts.Get(i);
+        NetDeviceContainer p2plink = p2p.Install(Router, host);
+
+        Ptr<NetDevice> routerDevice = p2plink.Get(0);
+        RouterDevices.Add(routerDevice);
+
+        Ptr<NetDevice> hostDevice = p2plink.Get(1);
+        HostDevices.Add(hostDevice);
+    }
+}
+
+/* Assigns IPs to the interfaces between hosts and routers. */
+void assignIPs(NetDeviceContainer& HostDevices, NetDeviceContainer& RouterDevices, Ipv4AddressHelper& IPHelper, Ipv4InterfaceContainer& HostInterfaces, Ipv4InterfaceContainer& RouterInterfaces){
+    assert(HostDevices.GetN() == RouterDevices.GetN());
+
+    for(uint i = 0; i < RouterDevices.GetN(); ++i)
+	{
+		NetDeviceContainer p2pLink;
+		p2pLink.Add(HostDevices.Get(i));
+		p2pLink.Add(RouterDevices.Get(i));
+
+		Ipv4InterfaceContainer p2pInterface = IPHelper.Assign(p2pLink);
+		HostInterfaces.Add(p2pInterface.Get(0));
+		RouterInterfaces.Add(p2pInterface.Get(1));
+
+		// Increments the network number and resets the IP address counter to the base value.
+		IPHelper.NewNetwork();
+    }
+}
+
 int main() 
 {
 	std::cout << "* PART-2 AND PART-3 STARTED *" << std::endl;
 	ExperimentParameters params;
-
-	//Creating channel without IP address
-	std::cout << "Creating channel without IP address" << std::endl;
+	
 	PointToPointHelper p2pHR = configureP2PHelper(params.rateHR, params.latencyHR, std::to_string(params.queueSizeHR)+"p");
 	PointToPointHelper p2pRR = configureP2PHelper(params.rateRR, params.latencyRR, std::to_string(params.queueSizeRR)+"p");
-	
-	//Adding some errorrate
-	std::cout << "Adding some errorrate" << std::endl;
-	Ptr<RateErrorModel> em = CreateObjectWithAttributes<RateErrorModel> ("ErrorRate", DoubleValue (params.errorParam));
+	Ptr<RateErrorModel> errorModel = CreateObjectWithAttributes<RateErrorModel> ("ErrorRate", DoubleValue (params.errorParam));
 
+	// Containers for the routers, senders and receivers.
 	NodeContainer routers, senders, receivers;
+
+	// Create the required number of hosts and routers, storing them in containers.
 	routers.Create(params.numRouters);
 	senders.Create(params.numSender);
 	receivers.Create(params.numReceiver);
 
+    // Connect routers.
 	NetDeviceContainer routerDevices = p2pRR.Install(routers);
+	
+	// Containers for the network devices on these nodes.
 	NetDeviceContainer leftRouterDevices, rightRouterDevices, senderDevices, receiverDevices;
 
-	//Adding links
 	std::cout << "Adding links...";
-	int i=0;
-	while(i<params.numSender)
-	{
-		NetDeviceContainer cleft = p2pHR.Install(routers.Get(0), senders.Get(i));
-		leftRouterDevices.Add(cleft.Get(0));
-		senderDevices.Add(cleft.Get(1));
-		cleft.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(em));
-		i++;
-	}
 
-	i=0;
-	while(i<params.numSender)
-	{
-		NetDeviceContainer cright = p2pHR.Install(routers.Get(1), receivers.Get(i));
-		rightRouterDevices.Add(cright.Get(0));
-		receiverDevices.Add(cright.Get(1));
-		cright.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(em));
-		i++;
-	}
-	std::cout<<"done"<< std::endl;
+    // Connect left router to senders. The NetDeviceContainers are filled in.
+    connectRouterToHosts(routers.Get(0), senders, p2pHR, leftRouterDevices, senderDevices);
 
+    // Connect right router to receivers. The NetDeviceContainers are filled in.
+    connectRouterToHosts(routers.Get(1), receivers, p2pHR, rightRouterDevices, receiverDevices);
+
+    // Check if network devices created and connected.
+    assert(leftRouterDevices.GetN() == (uint) params.numSender);
+    assert(leftRouterDevices.GetN() == rightRouterDevices.GetN());
+    assert(rightRouterDevices.GetN() == (uint) params.numReceiver);
+
+    // Sets Error Model to corrupt packets randomly.
+    int numRouterDevices = leftRouterDevices.GetN();
+    for(int i = 0; i < numRouterDevices; ++i){
+        Ptr<NetDevice> leftRouterDevice = leftRouterDevices.Get(0);
+        leftRouterDevice -> SetAttribute("ReceiveErrorModel", PointerValue(errorModel));
+
+        Ptr<NetDevice> rightRouterDevice = rightRouterDevices.Get(0);
+        rightRouterDevice -> SetAttribute("ReceiveErrorModel", PointerValue(errorModel));
+    }
+
+	std::cout<< "Topology set up." << std::endl;
+	
 	//Install Internet Stack
-	std::cout << "Install Internet Stack";
+	/*
+		For each node in the input container, aggregate implementations of 
+		the ns3::Ipv4, ns3::Ipv6, ns3::Udp, and, ns3::Tcp classes. 
+	*/
+	std::cout << "Installing Internet stack...";
 	InternetStackHelper stack;
 	stack.Install(routers);
 	stack.Install(senders);
 	stack.Install(receivers);
-	std::cout<<"done"<< std::endl;
+	std::cout << "Internet stack installed." << std::endl;
 
-	//Adding IP addresses
-	std::cout << "Assigning IP addresses..." << std::endl;
-	Ipv4AddressHelper routerIP = Ipv4AddressHelper("172.15.0.0", "255.255.255.0");
-	Ipv4AddressHelper senderIP = Ipv4AddressHelper("172.16.0.0", "255.255.255.0");
-	Ipv4AddressHelper receiverIP = Ipv4AddressHelper("172.17.0.0", "255.255.255.0");
+
+	// Assigning IP addresses. First, set the network prefix and the subnet mask.
+	std::cout << "Assigning IP addresses...";
+	Ipv4AddressHelper routerIPHelper = Ipv4AddressHelper("172.15.0.0", "255.255.255.0");
+	Ipv4AddressHelper senderIPHelper = Ipv4AddressHelper("172.16.0.0", "255.255.255.0");
+	Ipv4AddressHelper receiverIPHelper = Ipv4AddressHelper("172.17.0.0", "255.255.255.0");
 
 	Ipv4InterfaceContainer routerIFC, senderIFCs, receiverIFCs, leftRouterIFCs, rightRouterIFCs;
 
-	routerIFC = routerIP.Assign(routerDevices);
+	// Assign IP addresses to the net devices specified in the container based on the current network prefix and address base
+	routerIFC = routerIPHelper.Assign(routerDevices);
 
-	for(int i = 0; i < params.numSender; ++i) {
-		NetDeviceContainer senderDevice;
-		senderDevice.Add(senderDevices.Get(i));
-		senderDevice.Add(leftRouterDevices.Get(i));
-		Ipv4InterfaceContainer senderIFC = senderIP.Assign(senderDevice);
-		senderIFCs.Add(senderIFC.Get(0));
-		leftRouterIFCs.Add(senderIFC.Get(1));
-		senderIP.NewNetwork();
+    assignIPs(senderDevices, leftRouterDevices, senderIPHelper, senderIFCs, leftRouterIFCs);
+    assignIPs(receiverDevices, rightRouterDevices, receiverIPHelper, receiverIFCs, rightRouterIFCs);
 
-		NetDeviceContainer receiverDevice;
-		receiverDevice.Add(receiverDevices.Get(i));
-		receiverDevice.Add(rightRouterDevices.Get(i));
-		Ipv4InterfaceContainer receiverIFC = receiverIP.Assign(receiverDevice);
-		receiverIFCs.Add(receiverIFC.Get(0));
-		rightRouterIFCs.Add(receiverIFC.Get(1));
-		receiverIP.NewNetwork();
-	}
-	std::cout<<"done"<< std::endl;
+	std::cout<< "IPs assigned." << std::endl;
 	/********************************************************************
 	PART (b)
 	********************************************************************/
@@ -93,17 +157,17 @@ int main()
 	double oneFlowStart = 0;
 	double otherFlowStart = 20;
 	int port = 9000;
-	int numPackets = 20000000;
+	int numPackets = 1000000;
 	std::string transferSpeed = "400Mbps";
 		
 	
 	//TCP Reno from H1 to H4
 	std::cout << "** TCP Hybla from H1 to H4" << std::endl;
 	AsciiTraceHelper asciiTraceHelper;
-	Ptr<OutputStreamWrapper> h1cw = asciiTraceHelper.CreateFileStream("PartB/data_hybla_b.cwnd");
-	Ptr<OutputStreamWrapper> h1cl = asciiTraceHelper.CreateFileStream("PartB/hybla_b.cl");
-	Ptr<OutputStreamWrapper> h1tp = asciiTraceHelper.CreateFileStream("PartB/data_hybla_b.tp");
-	Ptr<OutputStreamWrapper> h1gp = asciiTraceHelper.CreateFileStream("PartB/data_hybla_b.gp");
+	Ptr<OutputStreamWrapper> h1cw = asciiTraceHelper.CreateFileStream("PartB/DataFiles/data_hybla_b.cw");
+	Ptr<OutputStreamWrapper> h1cl = asciiTraceHelper.CreateFileStream("PartB/DataFiles/hybla_b.cl");
+	Ptr<OutputStreamWrapper> h1tp = asciiTraceHelper.CreateFileStream("PartB/DataFiles/data_hybla_b.tp");
+	Ptr<OutputStreamWrapper> h1gp = asciiTraceHelper.CreateFileStream("PartB/DataFiles/data_hybla_b.gp");
 	Ptr<Socket> ns3TcpSocket1 = Simulate(InetSocketAddress(receiverIFCs.GetAddress(0), port), port, "TcpHybla", senders.Get(0), receivers.Get(0), oneFlowStart, oneFlowStart+durationGap, params.packetSize, numPackets, transferSpeed, oneFlowStart, oneFlowStart+durationGap);
 	ns3TcpSocket1->TraceConnectWithoutContext("CongestionWindow", MakeBoundCallback (&CwndChange, h1cw, 0));
 	ns3TcpSocket1->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h1cl, 0, 1));
@@ -116,10 +180,10 @@ int main()
 
 	//TCP Westwood from H2 to H5
 	std::cout << "** TCP WestwoodPlus from H2 to H5" << std::endl;
-	Ptr<OutputStreamWrapper> h2cw = asciiTraceHelper.CreateFileStream("PartB/data_westwood_b.cw");
-	Ptr<OutputStreamWrapper> h2cl = asciiTraceHelper.CreateFileStream("PartB/westwood_b.cl");
-	Ptr<OutputStreamWrapper> h2tp = asciiTraceHelper.CreateFileStream("PartB/data_westwood_b.tp");
-	Ptr<OutputStreamWrapper> h2gp = asciiTraceHelper.CreateFileStream("PartB/data_westwood_b.gp");
+	Ptr<OutputStreamWrapper> h2cw = asciiTraceHelper.CreateFileStream("PartB/DataFiles/data_westwoodplus_b.cw");
+	Ptr<OutputStreamWrapper> h2cl = asciiTraceHelper.CreateFileStream("PartB/DataFiles/westwoodplus_b.cl");
+	Ptr<OutputStreamWrapper> h2tp = asciiTraceHelper.CreateFileStream("PartB/DataFiles/data_westwoodplus_b.tp");
+	Ptr<OutputStreamWrapper> h2gp = asciiTraceHelper.CreateFileStream("PartB/DataFiles/data_westwoodplus_b.gp");
 	Ptr<Socket> ns3TcpSocket2 = Simulate(InetSocketAddress(receiverIFCs.GetAddress(1), port), port, "TcpWestwoodPlus", senders.Get(1), receivers.Get(1), otherFlowStart, otherFlowStart+durationGap, params.packetSize, numPackets, transferSpeed, otherFlowStart, otherFlowStart+durationGap);
 	ns3TcpSocket2->TraceConnectWithoutContext("CongestionWindow", MakeBoundCallback (&CwndChange, h2cw, 0));
 	ns3TcpSocket2->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h2cl, 0, 2));
@@ -131,10 +195,10 @@ int main()
 
 	//TCP Fack from H3 to H6
 	std::cout << "** TCP Yeah from H3 to H6" << std::endl;
-	Ptr<OutputStreamWrapper> h3cw = asciiTraceHelper.CreateFileStream("PartB/data_yeah_b.cwnd");
-	Ptr<OutputStreamWrapper> h3cl = asciiTraceHelper.CreateFileStream("PartB/yeah.cl");
-	Ptr<OutputStreamWrapper> h3tp = asciiTraceHelper.CreateFileStream("PartB/data_yeah_b.tp");
-	Ptr<OutputStreamWrapper> h3gp = asciiTraceHelper.CreateFileStream("PartB/data_yeah_b.gp");
+	Ptr<OutputStreamWrapper> h3cw = asciiTraceHelper.CreateFileStream("PartB/DataFiles/data_yeah_b.cw");
+	Ptr<OutputStreamWrapper> h3cl = asciiTraceHelper.CreateFileStream("PartB/DataFiles/yeah.cl");
+	Ptr<OutputStreamWrapper> h3tp = asciiTraceHelper.CreateFileStream("PartB/DataFiles/data_yeah_b.tp");
+	Ptr<OutputStreamWrapper> h3gp = asciiTraceHelper.CreateFileStream("PartB/DataFiles/data_yeah_b.gp");
 	Ptr<Socket> ns3TcpSocket3 = Simulate(InetSocketAddress(receiverIFCs.GetAddress(2), port), port, "TcpYeah", senders.Get(2), receivers.Get(2), otherFlowStart, otherFlowStart+durationGap, params.packetSize, numPackets, transferSpeed, otherFlowStart, otherFlowStart+durationGap);
 	ns3TcpSocket3->TraceConnectWithoutContext("CongestionWindow", MakeBoundCallback (&CwndChange, h3cw, 0));
 	ns3TcpSocket3->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h3cl, 0, 3));
