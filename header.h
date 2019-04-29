@@ -2,6 +2,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <map>
+#include <cassert>
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
 #include "ns3/point-to-point-module.h"
@@ -232,7 +233,7 @@ std::string dataRate,double appStartTime,double appStopTime)
 	return ns3TcpSocket;
 }
 
-struct NetworkParam
+struct ExperimentParameters
 {
 	std::string rateHR;
 	std::string latencyHR;
@@ -249,7 +250,7 @@ struct NetworkParam
 
 	double errorParam;
 
-	NetworkParam();
+	ExperimentParameters();
 };
 
 PointToPointHelper configureP2PHelper(std::string rate, std::string latency, std::string s);

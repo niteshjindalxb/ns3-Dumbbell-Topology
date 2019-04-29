@@ -3,7 +3,7 @@
 int main() 
 {
 	std::cout << "* PART-2 AND PART-3 STARTED *" << std::endl;
-	TopologyParam params;
+	ExperimentParameters params;
 
 	//Creating channel without IP address
 	std::cout << "Creating channel without IP address" << std::endl;
@@ -17,7 +17,7 @@ int main()
 	NodeContainer routers, senders, receivers;
 	routers.Create(params.numRouters);
 	senders.Create(params.numSender);
-	receivers.Create(params.numRecv);
+	receivers.Create(params.numReceiver);
 
 	NetDeviceContainer routerDevices = p2pRR.Install(routers);
 	NetDeviceContainer leftRouterDevices, rightRouterDevices, senderDevices, receiverDevices;

@@ -1,105 +1,127 @@
 #include "header.h"
 
-int main() 
+/* Connects a router to a host. */
+NetDeviceContainer& connectRouterToHost(Node * router, Node * host, PointToPointHelper& p2p){
+    NetDeviceContainer p2plink = p2pHR.Install(router, host);
+    return p2plink;
+}
+
+/* Connects a router to hosts passed in a NodeContainer, and fills in passed NetDeviceContainers with connected network devices. */
+void connectRouterToHosts(Node * router, NodeContainer& hosts, PointToPointHelper& p2p, NetDeviceContainer& RouterDevices, NetDeviceContainer& HostDevices){
+    for(int i = 0; i < NodeDevices.GetN(); ++i){
+        Node * host = hosts.Get(i);
+        NetDeviceContainer p2plink = connectRouterToNode(router, host, p2p);
+
+        NetDevice * routerDevice = p2plink.get(0);
+        RouterDevices.Add(routerDevice);
+
+        NetDevice * hostDevice = p2plink.get(1);
+        HostDevices.Add(hostDevice);
+    }
+}
+
+/* Assigns IPs to the interfaces between hosts and routers. */
+void assignIPs(HostDevices, RouterDevices, IPHelper, HostInterfaces, RouterInterfaces){
+    assert(HostDevices.GetN() == RouterDevices.GetN());
+
+    for(int i = 0; i < RouterDevices.GetN(); ++i)
+	{
+		NetDeviceContainer p2pLink;
+		p2pLink.Add(HostDevices.Get(i));
+		p2pLink.Add(RouterDevices.Get(i));
+
+		Ipv4InterfaceContainer p2pInterface = IPHelper.Assign(p2pLink);
+		HostInterfaces.Add(p2pInterface.Get(0));
+		RouterInterfaces.Add(p2pInterface.Get(1));
+
+		// Increments the network number and resets the IP address counter to the base value.
+		IPHelper.NewNetwork();
+    }
+}
+
+int main()
 {
 	std::cout << "* PART-1 AND PART-3 STARTED *" << std::endl;
-	TopologyParam params;
+	ExperimentParameters params;
 	
 	PointToPointHelper p2pHR = configureP2PHelper(params.rateHR, params.latencyHR, std::to_string(params.queueSizeHR)+"p");
 	PointToPointHelper p2pRR = configureP2PHelper(params.rateRR, params.latencyRR, std::to_string(params.queueSizeRR)+"p");
 	Ptr<RateErrorModel> errorModel = CreateObjectWithAttributes<RateErrorModel> ("ErrorRate", DoubleValue (params.errorParam));
 
-	//Empty node containers
+	// Containers for the routers, senders and receivers.
 	NodeContainer routers, senders, receivers;
-	//Create n nodes and append pointers to them to the end of this NodeContainer. 
+
+	// Create the required number of hosts and routers, storing them in containers.
 	routers.Create(params.numRouters);
 	senders.Create(params.numSender);
-	receivers.Create(params.numRecv);
+	receivers.Create(params.numReceiver);
 
+    // Connect routers.
 	NetDeviceContainer routerDevices = p2pRR.Install(routers);
 	
-	//Empty netdevicecontatiners
+	// Containers for the network devices on these nodes.
 	NetDeviceContainer leftRouterDevices, rightRouterDevices, senderDevices, receiverDevices;
 
-	//Adding links
 	std::cout << "Adding links...";
 
-	int i = 0;
-	while(i < params.numSender)
-	{
-		NetDeviceContainer cleft = p2pHR.Install(routers.Get(0), senders.Get(i));
-		leftRouterDevices.Add(cleft.Get(0));
-		senderDevices.Add(cleft.Get(1));
-		cleft.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(errorModel));
-		i++;
-	}
+    // Connect left router to senders. The NetDeviceContainers are filled in.
+    connectRouterToHosts(router.Get(0), senders, p2pHR, leftRouterDevices, senderDevices);
 
-	i = 0;
-	while(i < params.numSender)
-	{
-		NetDeviceContainer cright = p2pHR.Install(routers.Get(1), receivers.Get(i));
-		rightRouterDevices.Add(cright.Get(0));
-		receiverDevices.Add(cright.Get(1));
-		cright.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(errorModel));
-		i++;
-	}
+    // Connect right router to receivers. The NetDeviceContainers are filled in.
+    connectRouterToHosts(router.Get(1), receivers, p2pHR, rightRouterDevices, receiverDevices);
 
-	std::cout<<"done"<< std::endl;
+    // Check if network devices created and connected.
+    assert(leftRouterDevices.GetN() == params.numSender);
+    assert(leftRouterDevices.GetN() == rightRouterDevices.GetN());
+    assert(rightRouterDevices.GetN() == params.numReceiver);
+
+    // Sets Error Model to corrupt packets randomly.
+    numRouterDevices = leftRouterDevices.GetN();
+    for(int i = 0; i < numRouterDevices; ++i){
+        NetDevice * leftRouterDevice = leftRouterDevices.get(0);
+        leftRouterDevice -> SetAttribute("ReceiveErrorModel", PointerValue(errorModel));
+
+        NetDevice * rightRouterDevice = rightRouterDevices.get(0);
+        rightRouterDevice -> SetAttribute("ReceiveErrorModel", PointerValue(errorModel));
+    }
+
+	std::cout<< "Topology set up." << std::endl;
 	
 	//Install Internet Stack
 	/*
 		For each node in the input container, aggregate implementations of 
 		the ns3::Ipv4, ns3::Ipv6, ns3::Udp, and, ns3::Tcp classes. 
 	*/
-	std::cout << "Installing internet stack...";
+	std::cout << "Installing Internet stack...";
 	InternetStackHelper stack;
 	stack.Install(routers);
 	stack.Install(senders);
 	stack.Install(receivers);
-	std::cout<<"done"<< std::endl;
+	std::cout << "Internet stack installed." << std::endl;
 
-	//Adding IP addresses
 	std::cout << "Assigning IP addresses...";
-	Ipv4AddressHelper routerIP = Ipv4AddressHelper("172.15.0.0", "255.255.255.0");	//(network, mask)
+
+	// Assigning IP addresses. First, set the network prefix and the subnet mask.
+	Ipv4AddressHelper routerIP = Ipv4AddressHelper("172.15.0.0", "255.255.255.0");
 	Ipv4AddressHelper senderIP = Ipv4AddressHelper("172.16.0.0", "255.255.255.0");
 	Ipv4AddressHelper receiverIP = Ipv4AddressHelper("172.17.0.0", "255.255.255.0");
 
 	Ipv4InterfaceContainer routerIFC, senderIFCs, receiverIFCs, leftRouterIFCs, rightRouterIFCs;
 
-	//Assign IP addresses to the net devices specified in the container 
-	//based on the current network prefix and address base
+	// Assign IP addresses to the net devices specified in the container
+	// based on the current network prefix and address base
 	routerIFC = routerIP.Assign(routerDevices);
 
-	for(int i = 0; i < params.numSender; ++i) 
-	{
-		NetDeviceContainer senderDevice;
-		senderDevice.Add(senderDevices.Get(i));
-		senderDevice.Add(leftRouterDevices.Get(i));
+    assignIPs(senderDevices, leftRouterDevices, senderIPHelper, senderIFCs, leftRouterIFCs);
+    assignIPs(receiverDevices, rightRouterDevices, receiverIPHelper, receiverIFCs, rightRouterIFCs);
 
-		Ipv4InterfaceContainer senderIFC = senderIP.Assign(senderDevice);
-		senderIFCs.Add(senderIFC.Get(0));
-		leftRouterIFCs.Add(senderIFC.Get(1));
-		//Increment the network number and reset the IP address counter 
-		//to the base value provided in the SetBase method.
-		senderIP.NewNetwork();
-
-		NetDeviceContainer receiverDevice;
-		receiverDevice.Add(receiverDevices.Get(i));
-		receiverDevice.Add(rightRouterDevices.Get(i));
-		
-		Ipv4InterfaceContainer receiverIFC = receiverIP.Assign(receiverDevice);
-		receiverIFCs.Add(receiverIFC.Get(0));
-		rightRouterIFCs.Add(receiverIFC.Get(1));
-		receiverIP.NewNetwork();
-	}
-
-	std::cout<<"done"<< std::endl;
+	std::cout<< "IPs assigned." << std::endl;
 
 	/*
 		Measuring Performance of each TCP variant
 	*/
 
-	std::cout << "Measuring Performance of each TCP variant..." << std::endl;
+	std::cout << "Measuring performance of each TCP variant..." << std::endl;
 	/********************************************************************
 	PART (a)
 	********************************************************************/
@@ -114,7 +136,7 @@ int main()
 	int numPackets = 20000000;
 	std::string transferSpeed = "400Mbps";	
 
-	//TCP Reno from H1 to H4
+	// TCP Hybla from H1 to H4
 	std::cout<<"** TCP Hybla from H1 to H4 **"<<std::endl;
 	AsciiTraceHelper asciiTraceHelper;
 	Ptr<OutputStreamWrapper> h1cw = asciiTraceHelper.CreateFileStream("PartA/data_hybla_a.cw");

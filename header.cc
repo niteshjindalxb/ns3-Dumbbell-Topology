@@ -80,7 +80,7 @@ PointToPointHelper configureP2PHelper(std::string rate, std::string latency, std
 	PointToPointHelper p2p;
 	p2p.SetDeviceAttribute("DataRate", StringValue(rate));
 	p2p.SetChannelAttribute("Delay", StringValue(latency));
-	std::cout<<"Queue Size: "<<s<<std::endl;
+	std::cout << "Queue Size: " << s <<std::endl;
 	p2p.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue(s));
 	return p2p;
 }
@@ -91,10 +91,7 @@ static void CwndChange(Ptr<OutputStreamWrapper> stream, double startTime, int ol
 
 static void packetDrop(Ptr<OutputStreamWrapper> stream, double startTime, int myId) {
 	*stream->GetStream() << Simulator::Now ().GetSeconds () - startTime << "\t" << std::endl;
-	if(mapDrop.find(myId) == mapDrop.end()) {
-		mapDrop[myId] = 0;
-	}
-	mapDrop[myId]++;
+	mapDrop[myId] += 1;
 }
 
 void IncRate(Ptr<TestApp> app, DataRate rate) {
@@ -118,12 +115,15 @@ void ReceivedPacket(Ptr<OutputStreamWrapper> stream, double startTime, std::stri
 void ReceivedPacketIPV4(Ptr<OutputStreamWrapper> stream, double startTime, std::string context, Ptr<const Packet> p, Ptr<Ipv4> ipv4, int interface) {
 	double timeNow = Simulator::Now().GetSeconds();
 
-	if(mapBytesReceivedIPV4.find(context) == mapBytesReceivedIPV4.end())
+	if(!mapBytesReceivedIPV4.count(context))
 		mapBytesReceivedIPV4[context] = 0;
-	if(mapMaxThroughput.find(context) == mapMaxThroughput.end())
+
+	if(!mapMaxThroughput.count(context))
 		mapMaxThroughput[context] = 0;
+
 	mapBytesReceivedIPV4[context] += p->GetSize();
 	double kbps_ = (((mapBytesReceivedIPV4[context] * 8.0) / 1024)/(timeNow-startTime));
+
 	if(timeNow - lastTimePrintIPV4 >= printGap) {
 		lastTimePrintIPV4 = timeNow;
 		*stream->GetStream() << timeNow-startTime << "\t" <<  kbps_ << std::endl;
@@ -173,18 +173,23 @@ Ptr<Socket> Simulate(Address sinkAddress,
 	return ns3TcpSocket;
 }
 
-NetworkParam::NetworkParam() {
+/* Experiment Parameters */
+ExperimentParameters::ExperimentParameters() {
+    // Host to Router Bandwidth and Latency.
 	this -> rateHR = "100Mbps";
 	this -> latencyHR = "20ms";
+
+	// Router to Router Bandwidth and Latency.
 	this -> rateRR = "10Mbps";
 	this -> latencyRR = "50ms";
 
-	this -> packetSize = 1.3*1024;		// 1.3KB
+    // 1.3KB packet size.
+	this -> packetSize = 1.3*1024;
 	this -> queueSizeHR = (100*1000*20)/this->packetSize;	// #packets_queue_HR = (100Mbps)*(20ms)/packetSize
 	this -> queueSizeRR = (10*1000*50)/this->packetSize;	// #packets_queue_RR = (10Mbps)*(50ms)/packetSize
 
 	this -> numSender = 3;
-	this -> numRecv = 3;
+	this -> numReceiver = 3;
 	this -> numRouters = 2;
 
 	this -> errorParam = ERROR;
