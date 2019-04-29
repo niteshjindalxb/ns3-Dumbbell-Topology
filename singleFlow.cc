@@ -255,26 +255,26 @@ int main()
 		if(t.sourceAddress == "172.16.0.1") {
 			if(mapDrop.find(1)==mapDrop.end())
 				mapDrop[1] = 0;
-			*h1cl->GetStream() << "TcpHybla Flow " << i->first  << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
-			*h1cl->GetStream()  << "Net Packet Lost: " << i->second.lostPackets << "\n";
-			*h1cl->GetStream()  << "Packet Lost due to buffer overflow: " << mapDrop[1] << "\n";
-			*h1cl->GetStream()  << "Packet Lost due to Congestion: " << i->second.lostPackets - mapDrop[1] << "\n";
+			*h1cl->GetStream() << "Tcp Hybla " << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
+			*h1cl->GetStream()  << "Total Packets Lost: " << i->second.lostPackets << "\n";
+			*h1cl->GetStream()  << "Packets Lost due to buffer overflow: " << mapDrop[1] << "\n";
+			*h1cl->GetStream()  << "Packets Lost due to Congestion: " << i->second.lostPackets - mapDrop[1] << "\n";
 			*h1cl->GetStream() << "Max throughput: " << mapMaxThroughput["/NodeList/5/$ns3::Ipv4L3Protocol/Rx"] << std::endl;
 		} else if(t.sourceAddress == "172.16.1.1") {
 			if(mapDrop.find(2)==mapDrop.end())
 				mapDrop[2] = 0;
-			*h2cl->GetStream() << "Tcp Westwood Flow " << i->first  << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
-			*h2cl->GetStream()  << "Net Packet Lost: " << i->second.lostPackets << "\n";
-			*h2cl->GetStream()  << "Packet Lost due to buffer overflow: " << mapDrop[2] << "\n";
-			*h2cl->GetStream()  << "Packet Lost due to Congestion: " << i->second.lostPackets - mapDrop[2] << "\n";
+			*h2cl->GetStream() << "Tcp WestwoodPlus " << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
+			*h2cl->GetStream()  << "Total Packets Lost: " << i->second.lostPackets << "\n";
+			*h2cl->GetStream()  << "Packets Lost due to buffer overflow: " << mapDrop[2] << "\n";
+			*h2cl->GetStream()  << "Packets Lost due to Congestion: " << i->second.lostPackets - mapDrop[2] << "\n";
 			*h2cl->GetStream() << "Max throughput: " << mapMaxThroughput["/NodeList/6/$ns3::Ipv4L3Protocol/Rx"] << std::endl;
 		} else if(t.sourceAddress == "172.16.2.1") {
 			if(mapDrop.find(3)==mapDrop.end())
 				mapDrop[3] = 0;
-			*h3cl->GetStream() << "Tcp Fack Flow " << i->first  << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
-			*h3cl->GetStream()  << "Net Packet Lost: " << i->second.lostPackets << "\n";
-			*h3cl->GetStream()  << "Packet Lost due to buffer overflow: " << mapDrop[3] << "\n";
-			*h3cl->GetStream()  << "Packet Lost due to Congestion: " << i->second.lostPackets - mapDrop[3] << "\n";
+			*h3cl->GetStream() << "Tcp Yeah " << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
+			*h3cl->GetStream()  << "Total Packets Lost: " << i->second.lostPackets << "\n";
+			*h3cl->GetStream()  << "Packets Lost due to buffer overflow: " << mapDrop[3] << "\n";
+			*h3cl->GetStream()  << "Packets Lost due to Congestion: " << i->second.lostPackets - mapDrop[3] << "\n";
 			*h3cl->GetStream() << "Max throughput: " << mapMaxThroughput["/NodeList/7/$ns3::Ipv4L3Protocol/Rx"] << std::endl;
 		}
 	}

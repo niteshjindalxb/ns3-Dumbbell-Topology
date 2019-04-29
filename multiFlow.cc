@@ -233,7 +233,7 @@ int main()
 		if(t.sourceAddress == "172.15.0.1") {
 			if(mapDrop.find(1)==mapDrop.end())
 				mapDrop[1] = 0;
-			*h1cl->GetStream() << "TcpHybla Flow " << i->first  << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
+			*h1cl->GetStream() << "Tcp Hybla " << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
 			*h1cl->GetStream()  << "Net Packet Lost: " << i->second.lostPackets << "\n";
 			*h1cl->GetStream()  << "Packet Lost due to buffer overflow: " << mapDrop[1] << "\n";
 			*h1cl->GetStream()  << "Packet Lost due to Congestion: " << i->second.lostPackets - mapDrop[1] << "\n";
@@ -241,7 +241,7 @@ int main()
 		} else if(t.sourceAddress == "172.15.1.1") {
 			if(mapDrop.find(2)==mapDrop.end())
 				mapDrop[2] = 0;
-			*h2cl->GetStream() << "TcpWestwood Flow " << i->first  << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
+			*h2cl->GetStream() << "Tcp WestwoodPlus " << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
 			*h2cl->GetStream()  << "Net Packet Lost: " << i->second.lostPackets << "\n";
 			*h2cl->GetStream()  << "Packet Lost due to buffer overflow: " << mapDrop[2] << "\n";
 			*h2cl->GetStream()  << "Packet Lost due to Congestion: " << i->second.lostPackets - mapDrop[2] << "\n";
@@ -249,7 +249,7 @@ int main()
 		} else if(t.sourceAddress == "172.15.2.1") {
 			if(mapDrop.find(3)==mapDrop.end())
 				mapDrop[3] = 0;
-			*h3cl->GetStream() << "TcpYeah Flow " << i->first  << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
+			*h3cl->GetStream() << "Tcp Yeah " << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
 			*h3cl->GetStream()  << "Net Packet Lost: " << i->second.lostPackets << "\n";
 			*h3cl->GetStream()  << "Packet Lost due to buffer overflow: " << mapDrop[3] << "\n";
 			*h3cl->GetStream()  << "Packet Lost due to Congestion: " << i->second.lostPackets - mapDrop[3] << "\n";
