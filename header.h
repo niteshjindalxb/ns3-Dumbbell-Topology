@@ -176,7 +176,7 @@ void ReceivedPacketIPV4(Ptr<OutputStreamWrapper> stream, double startTime, std::
 }
 
 
-Ptr<Socket> uniFlow(Address sinkAddress, 
+Ptr<Socket> Simulate(Address sinkAddress, 
 					uint sinkPort, 
 					std::string tcpVariant, 
 					Ptr<Node> hostNode, 

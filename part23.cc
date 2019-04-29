@@ -104,7 +104,7 @@ int main()
 	Ptr<OutputStreamWrapper> h1cl = asciiTraceHelper.CreateFileStream("PartB/hybla_b.cl");
 	Ptr<OutputStreamWrapper> h1tp = asciiTraceHelper.CreateFileStream("PartB/data_hybla_b.tp");
 	Ptr<OutputStreamWrapper> h1gp = asciiTraceHelper.CreateFileStream("PartB/data_hybla_b.gp");
-	Ptr<Socket> ns3TcpSocket1 = uniFlow(InetSocketAddress(receiverIFCs.GetAddress(0), port), port, "TcpHybla", senders.Get(0), receivers.Get(0), oneFlowStart, oneFlowStart+durationGap, packetSize, numPackets, transferSpeed, oneFlowStart, oneFlowStart+durationGap);
+	Ptr<Socket> ns3TcpSocket1 = Simulate(InetSocketAddress(receiverIFCs.GetAddress(0), port), port, "TcpHybla", senders.Get(0), receivers.Get(0), oneFlowStart, oneFlowStart+durationGap, params.packetSize, numPackets, transferSpeed, oneFlowStart, oneFlowStart+durationGap);
 	ns3TcpSocket1->TraceConnectWithoutContext("CongestionWindow", MakeBoundCallback (&CwndChange, h1cw, 0));
 	ns3TcpSocket1->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h1cl, 0, 1));
 
@@ -120,7 +120,7 @@ int main()
 	Ptr<OutputStreamWrapper> h2cl = asciiTraceHelper.CreateFileStream("PartB/westwood_b.cl");
 	Ptr<OutputStreamWrapper> h2tp = asciiTraceHelper.CreateFileStream("PartB/data_westwood_b.tp");
 	Ptr<OutputStreamWrapper> h2gp = asciiTraceHelper.CreateFileStream("PartB/data_westwood_b.gp");
-	Ptr<Socket> ns3TcpSocket2 = uniFlow(InetSocketAddress(receiverIFCs.GetAddress(1), port), port, "TcpWestwood", senders.Get(1), receivers.Get(1), otherFlowStart, otherFlowStart+durationGap, packetSize, numPackets, transferSpeed, otherFlowStart, otherFlowStart+durationGap);
+	Ptr<Socket> ns3TcpSocket2 = Simulate(InetSocketAddress(receiverIFCs.GetAddress(1), port), port, "TcpWestwood", senders.Get(1), receivers.Get(1), otherFlowStart, otherFlowStart+durationGap, params.packetSize, numPackets, transferSpeed, otherFlowStart, otherFlowStart+durationGap);
 	ns3TcpSocket2->TraceConnectWithoutContext("CongestionWindow", MakeBoundCallback (&CwndChange, h2cw, 0));
 	ns3TcpSocket2->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h2cl, 0, 2));
 
@@ -135,7 +135,7 @@ int main()
 	Ptr<OutputStreamWrapper> h3cl = asciiTraceHelper.CreateFileStream("PartB/yeah.cl");
 	Ptr<OutputStreamWrapper> h3tp = asciiTraceHelper.CreateFileStream("PartB/data_yeah_b.tp");
 	Ptr<OutputStreamWrapper> h3gp = asciiTraceHelper.CreateFileStream("PartB/data_yeah_b.gp");
-	Ptr<Socket> ns3TcpSocket3 = uniFlow(InetSocketAddress(receiverIFCs.GetAddress(2), port), port, "TcpYeah", senders.Get(2), receivers.Get(2), otherFlowStart, otherFlowStart+durationGap, packetSize, numPackets, transferSpeed, otherFlowStart, otherFlowStart+durationGap);
+	Ptr<Socket> ns3TcpSocket3 = Simulate(InetSocketAddress(receiverIFCs.GetAddress(2), port), port, "TcpYeah", senders.Get(2), receivers.Get(2), otherFlowStart, otherFlowStart+durationGap, params.packetSize, numPackets, transferSpeed, otherFlowStart, otherFlowStart+durationGap);
 	ns3TcpSocket3->TraceConnectWithoutContext("CongestionWindow", MakeBoundCallback (&CwndChange, h3cw, 0));
 	ns3TcpSocket3->TraceConnectWithoutContext("Drop", MakeBoundCallback (&packetDrop, h3cl, 0, 3));
 
