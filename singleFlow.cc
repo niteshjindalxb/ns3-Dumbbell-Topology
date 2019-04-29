@@ -25,7 +25,7 @@ int main()
 	std::cout << "Adding links...";
 
 	int i = 0;
-	while(i< params.numSender)
+	while(i < params.numSender)
 	{
 		NetDeviceContainer cleft = p2pHR.Install(routers.Get(0), senders.Get(i));
 		leftRouterDevices.Add(cleft.Get(0));
@@ -34,8 +34,8 @@ int main()
 		i++;
 	}
 
-	i=0;
-	while(i< params.numSender)
+	i = 0;
+	while(i < params.numSender)
 	{
 		NetDeviceContainer cright = p2pHR.Install(routers.Get(1), receivers.Get(i));
 		rightRouterDevices.Add(cright.Get(0));

@@ -15,7 +15,7 @@
 using namespace ns3;
 
 
-DumbbellTopology::DumbbellTopology(): mSocket(0),
+TestApp::TestApp(): mSocket(0),
 		    mPeer(),
 		    mPacketSize(0),
 		    mNPackets(0),
@@ -25,7 +25,7 @@ DumbbellTopology::DumbbellTopology(): mSocket(0),
 		    mPacketsSent(0) {
 }
 
-void DumbbellTopology::Setup(Ptr<Socket> socket, Address address, int packetSize, int nPackets, DataRate dataRate) {
+void TestApp::Setup(Ptr<Socket> socket, Address address, int packetSize, int nPackets, DataRate dataRate) {
 	mSocket = socket;
 	mPeer = address;
 	mPacketSize = packetSize;
@@ -33,7 +33,7 @@ void DumbbellTopology::Setup(Ptr<Socket> socket, Address address, int packetSize
 	mDataRate = dataRate;
 }
 
-void DumbbellTopology::StartApplication() {
+void TestApp::StartApplication() {
 	mRunning = true;
 	mPacketsSent = 0;
 	mSocket->Bind();
@@ -41,7 +41,7 @@ void DumbbellTopology::StartApplication() {
 	SendPacket();
 }
 
-void DumbbellTopology::StopApplication() {
+void TestApp::StopApplication() {
 	mRunning = false;
 	if(mSendEvent.IsRunning()) {
 		Simulator::Cancel(mSendEvent);
@@ -51,7 +51,7 @@ void DumbbellTopology::StopApplication() {
 	}
 }
 
-void DumbbellTopology::SendPacket() {
+void TestApp::SendPacket() {
 	Ptr<Packet> packet = Create<Packet>(mPacketSize);
 	mSocket->Send(packet);
 
@@ -60,17 +60,17 @@ void DumbbellTopology::SendPacket() {
 	}
 }
 
-void DumbbellTopology::ScheduleTx() {
+void TestApp::ScheduleTx() {
 	if (mRunning) {
 		Time tNext(Seconds(mPacketSize*8/static_cast<double>(mDataRate.GetBitRate())));
-		mSendEvent = Simulator::Schedule(tNext, &DumbbellTopology::SendPacket, this);
+		mSendEvent = Simulator::Schedule(tNext, &TestApp::SendPacket, this);
 		//double tVal = Simulator::Now().GetSeconds();
 		//if(tVal-int(tVal) >= 0.99)
 		//	std::cout << Simulator::Now ().GetSeconds () << "\t" << mPacketsSent << std::endl;
 	}
 }
 
-void DumbbellTopology::ChangeRate(DataRate newrate) {
+void TestApp::ChangeRate(DataRate newrate) {
 	mDataRate = newrate;
 	return;
 }
@@ -97,7 +97,7 @@ static void packetDrop(Ptr<OutputStreamWrapper> stream, double startTime, int my
 	mapDrop[myId]++;
 }
 
-void IncRate(Ptr<DumbbellTopology> app, DataRate rate) {
+void IncRate(Ptr<TestApp> app, DataRate rate) {
 	app->ChangeRate(rate);
 	return;
 }
@@ -164,7 +164,7 @@ Ptr<Socket> Simulate(Address sinkAddress,
 	Ptr<Socket> ns3TcpSocket = Socket::CreateSocket(hostNode, TcpSocketFactory::GetTypeId());
 	
 
-	Ptr<DumbbellTopology> app = CreateObject<DumbbellTopology>();
+	Ptr<TestApp> app = CreateObject<TestApp>();
 	app->Setup(ns3TcpSocket, sinkAddress, packetSize, numPackets, DataRate(dataRate));
 	hostNode->AddApplication(app);
 	app->SetStartTime(Seconds(appStartTime));
@@ -173,7 +173,7 @@ Ptr<Socket> Simulate(Address sinkAddress,
 	return ns3TcpSocket;
 }
 
-TopologyParam::TopologyParam() {
+NetworkParam::NetworkParam() {
 	this -> rateHR = "100Mbps";
 	this -> latencyHR = "20ms";
 	this -> rateRR = "10Mbps";
