@@ -192,7 +192,8 @@ Ptr<Socket> uniFlow(Address sinkAddress,
 	if(tcpVariant.compare("TcpHybla") == 0) {
 		Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpHybla::GetTypeId()));
 	} else if(tcpVariant.compare("TcpWestwood") == 0) {
-		Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpWestwoodPlus::GetTypeId()));
+		Config::SetDefault ("ns3::TcpWestwood::ProtocolType", EnumValue (TcpWestwood::WESTWOODPLUS));
+		Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpWestwood::GetTypeId()));
 	} else if(tcpVariant.compare("TcpYeah") == 0) {
 		Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpYeah::GetTypeId()));
 	} else {
