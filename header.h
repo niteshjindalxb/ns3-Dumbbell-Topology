@@ -11,13 +11,16 @@
 #include "ns3/ipv4-global-routing-helper.h"
 #include "ns3/gnuplot.h"
 
-typedef uint32_t uint;
+#ifndef HEADER_H
+#define HEADER_H
+
+typedef uint32_t int;
 
 using namespace ns3;
 
 #define ERROR 0.000001
 
-NS_LOG_COMPONENT_DEFINE ("App6");
+NS_LOG_COMPONENT_DEFINE ("DumbbellTopology");
 
 class DumbbellTopology: public Application {
 	private:
@@ -38,9 +41,9 @@ class DumbbellTopology: public Application {
 
 	public:
 		DumbbellTopology();
-		virtual ~DumbbellTopology();
+		virtual ~DumbbellTopology() 	{		mSocket = 0;		}
 
-		void Setup(Ptr<Socket> socket, Address address, uint packetSize, uint nPackets, DataRate dataRate);
+		void Setup(Ptr<Socket> socket, Address address, int packetSize, int nPackets, DataRate dataRate);
 		void ChangeRate(DataRate newRate);
 		void recv(int numBytesRcvd);
 
@@ -249,19 +252,24 @@ struct TopologyParam
 	TopologyParam();
 };
 
-TopologyParam::TopologyParam() {
-	this -> rateHR = "100Mbps";
-	this -> latencyHR = "20ms";
-	this -> rateRR = "10Mbps";
-	this -> latencyRR = "50ms";
+PointToPointHelper configureP2PHelper(std::string rate, std::string latency, std::string s);
+static void CwndChange(Ptr<OutputStreamWrapper> stream, double startTime, int oldCwnd, int newCwnd);
+static void packetDrop(Ptr<OutputStreamWrapper> stream, double startTime, int myId);
+void IncRate(Ptr<DumbbellTopology> app, DataRate rate);
+void ReceivedPacket(Ptr<OutputStreamWrapper> stream, double startTime, std::string context, Ptr<const Packet> p, const Address& addr);
+void ReceivedPacketIPV4(Ptr<OutputStreamWrapper> stream, double startTime, std::string context, Ptr<const Packet> p, Ptr<Ipv4> ipv4, int interface);
+Ptr<Socket> Simulate(Address sinkAddress, 
+					int sinkPort, 
+					std::string tcpVariant, 
+					Ptr<Node> hostNode, 
+					Ptr<Node> sinkNode, 
+					double startTime, 
+					double stopTime,
+					int packetSize,
+					int numPackets,
+					std::string dataRate,
+					double appStartTime,
+					double appStopTime);
 
-	this -> packetSize = 1.3*1024;		// 1.3KB
-	this -> queueSizeHR = (100*1000*20)/this->packetSize;	// #packets_queue_HR = (100Mbps)*(20ms)/packetSize
-	this -> queueSizeRR = (10*1000*50)/this->packetSize;	// #packets_queue_RR = (10Mbps)*(50ms)/packetSize
 
-	this -> numSender = 3;
-	this -> numRecv = 3;
-	this -> numRouters = 2;
-
-	this -> errorParam = ERROR;
-}
+#endif
