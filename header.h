@@ -2,7 +2,6 @@
 #include <fstream>
 #include <cstdlib>
 #include <map>
-#include <cassert>
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
 #include "ns3/point-to-point-module.h"
@@ -12,18 +11,15 @@
 #include "ns3/ipv4-global-routing-helper.h"
 #include "ns3/gnuplot.h"
 
-#ifndef HEADER_H
-#define HEADER_H
-
-typedef uint32_t int;
+typedef uint32_t uint;
 
 using namespace ns3;
 
 #define ERROR 0.000001
 
-NS_LOG_COMPONENT_DEFINE ("TestApp");
+NS_LOG_COMPONENT_DEFINE ("App6");
 
-class TestApp: public Application {
+class DumbbellTopology: public Application {
 	private:
 		virtual void StartApplication(void);
 		virtual void StopApplication(void);
@@ -41,16 +37,16 @@ class TestApp: public Application {
 		uint32_t        mPacketsSent;
 
 	public:
-		TestApp();
-		virtual ~TestApp() 	{		mSocket = 0;		}
+		DumbbellTopology();
+		virtual ~DumbbellTopology();
 
-		void Setup(Ptr<Socket> socket, Address address, int packetSize, int nPackets, DataRate dataRate);
+		void Setup(Ptr<Socket> socket, Address address, uint packetSize, uint nPackets, DataRate dataRate);
 		void ChangeRate(DataRate newRate);
 		void recv(int numBytesRcvd);
 
 };
 
-TestApp::TestApp(): mSocket(0),
+DumbbellTopology::DumbbellTopology(): mSocket(0),
 		    mPeer(),
 		    mPacketSize(0),
 		    mNPackets(0),
@@ -60,11 +56,11 @@ TestApp::TestApp(): mSocket(0),
 		    mPacketsSent(0) {
 }
 
-TestApp::~TestApp() {
+DumbbellTopology::~DumbbellTopology() {
 	mSocket = 0;
 }
 
-void TestApp::Setup(Ptr<Socket> socket, Address address, uint packetSize, uint nPackets, DataRate dataRate) {
+void DumbbellTopology::Setup(Ptr<Socket> socket, Address address, uint packetSize, uint nPackets, DataRate dataRate) {
 	mSocket = socket;
 	mPeer = address;
 	mPacketSize = packetSize;
@@ -72,7 +68,7 @@ void TestApp::Setup(Ptr<Socket> socket, Address address, uint packetSize, uint n
 	mDataRate = dataRate;
 }
 
-void TestApp::StartApplication() {
+void DumbbellTopology::StartApplication() {
 	mRunning = true;
 	mPacketsSent = 0;
 	mSocket->Bind();
@@ -80,7 +76,7 @@ void TestApp::StartApplication() {
 	SendPacket();
 }
 
-void TestApp::StopApplication() {
+void DumbbellTopology::StopApplication() {
 	mRunning = false;
 	if(mSendEvent.IsRunning()) {
 		Simulator::Cancel(mSendEvent);
@@ -90,7 +86,7 @@ void TestApp::StopApplication() {
 	}
 }
 
-void TestApp::SendPacket() {
+void DumbbellTopology::SendPacket() {
 	Ptr<Packet> packet = Create<Packet>(mPacketSize);
 	mSocket->Send(packet);
 
@@ -99,17 +95,17 @@ void TestApp::SendPacket() {
 	}
 }
 
-void TestApp::ScheduleTx() {
+void DumbbellTopology::ScheduleTx() {
 	if (mRunning) {
 		Time tNext(Seconds(mPacketSize*8/static_cast<double>(mDataRate.GetBitRate())));
-		mSendEvent = Simulator::Schedule(tNext, &TestApp::SendPacket, this);
+		mSendEvent = Simulator::Schedule(tNext, &DumbbellTopology::SendPacket, this);
 		//double tVal = Simulator::Now().GetSeconds();
 		//if(tVal-int(tVal) >= 0.99)
 		//	std::cout << Simulator::Now ().GetSeconds () << "\t" << mPacketsSent << std::endl;
 	}
 }
 
-void TestApp::ChangeRate(DataRate newrate) {
+void DumbbellTopology::ChangeRate(DataRate newrate) {
 	mDataRate = newrate;
 	return;
 }
@@ -224,7 +220,7 @@ std::string dataRate,double appStartTime,double appStopTime)
 	Ptr<Socket> ns3TcpSocket = Socket::CreateSocket(hostNode, TcpSocketFactory::GetTypeId());
 	
 
-	Ptr<TestApp> app = CreateObject<TestApp>();
+	Ptr<DumbbellTopology> app = CreateObject<DumbbellTopology>();
 	app->Setup(ns3TcpSocket, sinkAddress, packetSize, numPackets, DataRate(dataRate));
 	hostNode->AddApplication(app);
 	app->SetStartTime(Seconds(appStartTime));
@@ -233,7 +229,7 @@ std::string dataRate,double appStartTime,double appStopTime)
 	return ns3TcpSocket;
 }
 
-struct ExperimentParameters
+struct TopologyParam
 {
 	std::string rateHR;
 	std::string latencyHR;
@@ -250,15 +246,22 @@ struct ExperimentParameters
 
 	double errorParam;
 
-	ExperimentParameters();
+	TopologyParam();
 };
 
-PointToPointHelper configureP2PHelper(std::string rate, std::string latency, std::string s);
-static void CwndChange(Ptr<OutputStreamWrapper> stream, double startTime, int oldCwnd, int newCwnd);
-static void packetDrop(Ptr<OutputStreamWrapper> stream, double startTime, int myId);
-void IncRate(Ptr<TestApp> app, DataRate rate);
-void ReceivedPacket(Ptr<OutputStreamWrapper> stream, double startTime, std::string context, Ptr<const Packet> p, const Address& addr);
-void ReceivedPacketIPV4(Ptr<OutputStreamWrapper> stream, double startTime, std::string context, Ptr<const Packet> p, Ptr<Ipv4> ipv4, int interface);
-Ptr<Socket> Simulate(Address sinkAddress, int sinkPort, std::string tcpVariant, Ptr<Node> hostNode, Ptr<Node> sinkNode, double startTime, double stopTime, int packetSize, int numPackets, std::string dataRate, double appStartTime, double appStopTime);
+TopologyParam::TopologyParam() {
+	this -> rateHR = "100Mbps";
+	this -> latencyHR = "20ms";
+	this -> rateRR = "10Mbps";
+	this -> latencyRR = "50ms";
 
-#endif
+	this -> packetSize = 1.3*1024;		// 1.3KB
+	this -> queueSizeHR = (100*1000*20)/this->packetSize;	// #packets_queue_HR = (100Mbps)*(20ms)/packetSize
+	this -> queueSizeRR = (10*1000*50)/this->packetSize;	// #packets_queue_RR = (10Mbps)*(50ms)/packetSize
+
+	this -> numSender = 3;
+	this -> numRecv = 3;
+	this -> numRouters = 2;
+
+	this -> errorParam = ERROR;
+}
