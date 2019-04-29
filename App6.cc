@@ -1,4 +1,26 @@
 /*
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation;
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * 
+ * This code heavily borrows from ns3 itself which are copyright of their
+ * respective authors and redistributable under the same conditions.
+ *
+ */
+
+
+/*
 Application Detail:
 Analyse and compare TCP Reno, TCP Westwood, and TCP Fack (i.e. Reno TCP with "forward
 acknowledgment") performance. Select a Dumbbell topology with two routers R1 and R2 connected by a
@@ -53,7 +75,7 @@ Senders	|	H2------R1------R2-----H5	 |	Receivers
 #include "ns3/ipv4-global-routing-helper.h"
 #include "ns3/gnuplot.h"
 
-typedef uint32_t int;
+typedef uint32_t uint;
 
 using namespace ns3;
 
@@ -82,7 +104,7 @@ class APP: public Application {
 		APP();
 		virtual ~APP();
 
-		void Setup(Ptr<Socket> socket, Address address, int packetSize, int nPackets, DataRate dataRate);
+		void Setup(Ptr<Socket> socket, Address address, uint packetSize, uint nPackets, DataRate dataRate);
 		void ChangeRate(DataRate newRate);
 		void recv(int numBytesRcvd);
 
@@ -102,7 +124,7 @@ APP::~APP() {
 	mSocket = 0;
 }
 
-void APP::Setup(Ptr<Socket> socket, Address address, int packetSize, int nPackets, DataRate dataRate) {
+void APP::Setup(Ptr<Socket> socket, Address address, uint packetSize, uint nPackets, DataRate dataRate) {
 	mSocket = socket;
 	mPeer = address;
 	mPacketSize = packetSize;
@@ -152,12 +174,12 @@ void APP::ChangeRate(DataRate newrate) {
 	return;
 }
 
-static void CwndChange(Ptr<OutputStreamWrapper> stream, double startTime, int oldCwnd, int newCwnd) {
+static void CwndChange(Ptr<OutputStreamWrapper> stream, double startTime, uint oldCwnd, uint newCwnd) {
 	*stream->GetStream() << Simulator::Now ().GetSeconds () - startTime << "\t" << newCwnd << std::endl;
 }
 
-std::map<int, int> mapDrop;
-static void packetDrop(Ptr<OutputStreamWrapper> stream, double startTime, int myId) {
+std::map<uint, uint> mapDrop;
+static void packetDrop(Ptr<OutputStreamWrapper> stream, double startTime, uint myId) {
 	*stream->GetStream() << Simulator::Now ().GetSeconds () - startTime << "\t" << std::endl;
 	if(mapDrop.find(myId) == mapDrop.end()) {
 		mapDrop[myId] = 0;
@@ -189,7 +211,7 @@ void ReceivedPacket(Ptr<OutputStreamWrapper> stream, double startTime, std::stri
 	}
 }
 
-void ReceivedPacketIPV4(Ptr<OutputStreamWrapper> stream, double startTime, std::string context, Ptr<const Packet> p, Ptr<Ipv4> ipv4, int interface) {
+void ReceivedPacketIPV4(Ptr<OutputStreamWrapper> stream, double startTime, std::string context, Ptr<const Packet> p, Ptr<Ipv4> ipv4, uint interface) {
 	double timeNow = Simulator::Now().GetSeconds();
 
 	if(mapBytesReceivedIPV4.find(context) == mapBytesReceivedIPV4.end())
@@ -208,14 +230,14 @@ void ReceivedPacketIPV4(Ptr<OutputStreamWrapper> stream, double startTime, std::
 
 
 Ptr<Socket> uniFlow(Address sinkAddress, 
-					int sinkPort, 
+					uint sinkPort, 
 					std::string tcpVariant, 
 					Ptr<Node> hostNode, 
 					Ptr<Node> sinkNode, 
 					double startTime, 
 					double stopTime,
-					int packetSize,
-					int numPackets,
+					uint packetSize,
+					uint numPackets,
 					std::string dataRate,
 					double appStartTime,
 					double appStopTime) {
@@ -247,192 +269,138 @@ Ptr<Socket> uniFlow(Address sinkAddress,
 	return ns3TcpSocket;
 }
 
-struct TopologyParam
-{
-	std::string bandwidth_hostToRouter;
-	std::string delay_hostToRouter;
-	std::string bandwidth_routerToRouter;
-	std::string delay_routerToRouter;
+void partAC() {
+	std::cout << "Part A started..." << std::endl;
+	std::string rateHR = "100Mbps";
+	std::string latencyHR = "20ms";
+	std::string rateRR = "10Mbps";
+	std::string latencyRR = "50ms";
 
-	int packetSize;
-	int queueSizeHR;
-	int queueSizeRR;
+	uint packetSize = 1.2*1024;		//1.2KB
+	uint queueSizeHR = (100000*20)/packetSize;
+	uint queueSizeRR = (10000*50)/packetSize;
 
-	int numSender;
-	int numRecv;
-	int numRouters;
+	uint numSender = 3;
 
-	double errorP;
+	double errorP = ERROR;
 
-	TopologyParam();
-};
+	//set droptail queue mode as packets i.e. to use maxpackets as queuesize metric not bytes
+	// Config::SetDefault("ns3::DropTailQueue::Mode", StringValue("QUEUE_MODE_PACKETS"));
+    /*
+    Config::SetDefault("ns3::DropTailQueue::MaxPackets", UintegerValue(queuesize));
+	*/
 
-TopologyParam::TopologyParam() {
-	this -> bandwidth_hostToRouter = "100Mbps";
-	this -> delay_hostToRouter = "20ms";
-	this -> bandwidth_routerToRouter = "10Mbps";
-	this -> delay_routerToRouter = "50ms";
+	//Creating channel without IP address
+	PointToPointHelper p2pHR, p2pRR;
+	/*
+		SetDeviceAttribute: sets attributes of pointToPointNetDevice
+		DataRate
+		Address: MACAddress
+		ReceiveErrorModel
+		InterframeGap: The time to wait between packet (frame) transmissions
+		TxQueue: A queue to use as the transmit queue in the device.
 
-	this -> packetSize = 1.3*1024;		// 1.3KB
-	this -> queueSizeHR = (100*1000*20)/this->packetSize;	// #packets_queue_HR = (100Mbps)*(20ms)/packetSize
-	this -> queueSizeRR = (10*1000*50)/this->packetSize;	// #packets_queue_RR = (10Mbps)*(50ms)/packetSize
+		SetChannelAttribute: sets attributes of pointToPointChannel
+		Delay: Transmission delay through the channel
 
-	this -> numSender = 3;
-	this -> numRecv = 3;
-	this -> numRouters = 2;
+		SetQueue: sets attribute of a queue say droptailqueue
+		Mode: Whether to use Bytes (see MaxBytes) or Packets (see MaxPackets) as the maximum queue size metric.
+		MaxPackets: The maximum number of packets accepted by this DropTailQueue.
+		MaxBytes: The maximum number of bytes accepted by this DropTailQueue.
+	*/
+	p2pHR.SetDeviceAttribute("DataRate", StringValue(rateHR));
+	p2pHR.SetChannelAttribute("Delay", StringValue(latencyHR));
+	p2pHR.SetQueue("ns3::DropTailQueue", "MaxPackets", UintegerValue(queueSizeHR));
+	p2pRR.SetDeviceAttribute("DataRate", StringValue(rateRR));
+	p2pRR.SetChannelAttribute("Delay", StringValue(latencyRR));
+	p2pRR.SetQueue("ns3::DropTailQueue", "MaxPackets", UintegerValue(queueSizeRR));
 
-	this -> errorP = ERROR;
-}
+	//Adding some errorrate
+	/*
+		Error rate model attributes
+		ErrorUnit: The error unit
+		ErrorRate: The error rate.
+		RanVar: The decision variable attached to this error model.
+	*/
+	Ptr<RateErrorModel> em = CreateObjectWithAttributes<RateErrorModel> ("ErrorRate", DoubleValue (errorP));
 
-class DumbbellTopology
-{
-private:
-	PointToPointHelper pointToPointRouter;
-	PointToPointHelper pointToPointLeaf;
-	Ptr<RateErrorModel> errorModel;
+	//Empty node containers
 	NodeContainer routers, senders, receivers;
-	NetDeviceContainer routerDevices;
+	//Create n nodes and append pointers to them to the end of this NodeContainer. 
+	routers.Create(2);
+	senders.Create(numSender);
+	receivers.Create(numSender);
+
+	/*
+		p2pHelper.Install:
+		This method creates a ns3::PointToPointChannel with the attributes configured 
+		by PointToPointHelper::SetChannelAttribute, then, for each node in the input container,
+		we create a ns3::PointToPointNetDevice with the requested attributes, 
+		a queue for this ns3::NetDevice, and associate the resulting ns3::NetDevice 
+		with the ns3::Node and ns3::PointToPointChannel.
+	*/
+	NetDeviceContainer routerDevices = p2pRR.Install(routers);
+	//Empty netdevicecontatiners
 	NetDeviceContainer leftRouterDevices, rightRouterDevices, senderDevices, receiverDevices;
-	InternetStackHelper stack;
-	Ipv4AddressHelper routerIP, senderIP, receiverIP;
-	Ipv4InterfaceContainer routerIFC, senderIFCs, receiverIFCs, leftRouterIFCs, rightRouterIFCs;
 
-public:
-	void setConnections(TopologyParam topologyParams);
-	void createNodes(TopologyParam topologyParams);
-	void setNetDevices(TopologyParam topologyParams);
-	void installInternetStack(TopologyParam topologyParams);
-	void addIpAddrToNodes(TopologyParam topologyParams);
-	void addIpAddrToNetDevices(TopologyParam topologyParams);
-}
-
-//Creating channel without IP address
-/*
-	SetDeviceAttribute: sets attributes of pointToPointNetDevice
-	DataRate: Bandwidth
-
-	SetChannelAttribute: sets attributes of pointToPointChannel
-	Delay: Transmission delay through the channel
-
-	SetQueue: sets attribute of a queue say droptailqueue
-	MaxPackets: The maximum number of packets accepted by this DropTailQueue.
-*/
-void DumbbellTopology::setConnections(TopologyParam topologyParams) {
-	this->pointToPointRouter.SetDeviceAttribute("DataRate", StringValue(topologyParams.bandwidth_hostToRouter));
-	this->pointToPointRouter.SetChannelAttribute("Delay", StringValue(topologyParams.delay_hostToRouter));
-	this->pointToPointRouter.SetQueue("ns3::DropTailQueue", "MaxPackets", UintegerValue(topologyParams.queueSizeHR));
-
-	this->pointToPointLeaf.SetDeviceAttribute("DataRate", StringValue(topologyParams.bandwidth_routerToRouter));
-	this->pointToPointLeaf.SetChannelAttribute("Delay", StringValue(topologyParams.delay_routerToRouter));
-	this->pointToPointLeaf.SetQueue("ns3::DropTailQueue", "MaxPackets", UintegerValue(topologyParams.queueSizeRR));
-}
-
-void DumbbellTopology::createNodes(TopologyParam topologyParams) {
-	//Create n nodes and append pointers to them to the end of this NodeContainer.
-	this->routers.Create(topologyParams.numRouters);
-	this->senders.Create(topologyParams.numSender);
-	this->receivers.Create(topologyParams.numRecv);
-}
-
-/*
-	p2pHelper.Install:
-	This method creates a ns3::PointToPointChannel with the attributes configured 
-	by PointToPointHelper::SetChannelAttribute, then, for each node in the input container,
-	we create a ns3::PointToPointNetDevice with the requested attributes, 
-	a queue for this ns3::NetDevice, and associate the resulting ns3::NetDevice 
-	with the ns3::Node and ns3::PointToPointChannel.
-*/
-void DumbbellTopology::setNetDevices(TopologyParam topologyParams) {
-
-	this->routerDevices = this->pointToPointLeaf.Install(this->routers);
-	
 	//Adding links
 	std::cout << "Adding links" << std::endl;
-	for (int i = 0; i < this->numSender; ++i) {
-		NetDeviceContainer cleft = this->pointToPointRouter.Install(this->routers.Get(0), this->senders.Get(i));
-		this->leftRouterDevices.Add(cleft.Get(0));
-		this->senderDevices.Add(cleft.Get(1));
-		cleft.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(this->errorModel));
+	for(uint i = 0; i < numSender; ++i) {
+		NetDeviceContainer cleft = p2pHR.Install(routers.Get(0), senders.Get(i));
+		leftRouterDevices.Add(cleft.Get(0));
+		senderDevices.Add(cleft.Get(1));
+		cleft.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(em));
 
-		NetDeviceContainer cright = this->pointToPointRouter.Install(this->routers.Get(1), this->receivers.Get(i));
-		this->rightRouterDevices.Add(cright.Get(0));
-		this->receiverDevices.Add(cright.Get(1));
-		cright.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(this->errorModel));
+		NetDeviceContainer cright = p2pHR.Install(routers.Get(1), receivers.Get(i));
+		rightRouterDevices.Add(cright.Get(0));
+		receiverDevices.Add(cright.Get(1));
+		cright.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(em));
 	}
-}
 
-//Install Internet Stack
-/*
-	For each node in the input container, aggregate implementations of 
-	the ns3::Ipv4, ns3::Ipv6, ns3::Udp, and, ns3::Tcp classes. 
-*/
-void DumbbellTopology::installInternetStack(TopologyParam topologyParams) {
+	//Install Internet Stack
+	/*
+		For each node in the input container, aggregate implementations of 
+		the ns3::Ipv4, ns3::Ipv6, ns3::Udp, and, ns3::Tcp classes. 
+	*/
 	std::cout << "Install internet stack" << std::endl;
+	InternetStackHelper stack;
+	stack.Install(routers);
+	stack.Install(senders);
+	stack.Install(receivers);
 
-	this->stack.Install(this->routers);
-	this->stack.Install(this->senders);
-	this->stack.Install(this->receivers);
-}
 
-//Adding IP addresses
-void DumbbellTopology::addIpAddrToNodes(TopologyParam topologyParams) {
+	//Adding IP addresses
 	std::cout << "Adding IP addresses" << std::endl;
-	this->routerIP = Ipv4AddressHelper("10.3.0.0", "255.255.255.0");	//(network, mask)
-	this->senderIP = Ipv4AddressHelper("10.1.0.0", "255.255.255.0");
-	this->receiverIP = Ipv4AddressHelper("10.2.0.0", "255.255.255.0");
-}
+	Ipv4AddressHelper routerIP = Ipv4AddressHelper("10.3.0.0", "255.255.255.0");	//(network, mask)
+	Ipv4AddressHelper senderIP = Ipv4AddressHelper("10.1.0.0", "255.255.255.0");
+	Ipv4AddressHelper receiverIP = Ipv4AddressHelper("10.2.0.0", "255.255.255.0");
+	
 
-//Adding some errorrate
-/*
-	Error rate model attributes
-	ErrorUnit: The error unit
-	ErrorRate: The error rate.
-	RanVar: The decision variable attached to this error model.
-*/
-void DumbbellTopology::setErrorRate(TopologyParam topologyParams) {
-	this->errorModel = CreateObjectWithAttributes<RateErrorModel> ("ErrorRate", DoubleValue (topologyParams.errorP));
-}
-
-void DumbbellTopology::addIpAddrToNetDevices(TopologyParam topologyParams) {
+	Ipv4InterfaceContainer routerIFC, senderIFCs, receiverIFCs, leftRouterIFCs, rightRouterIFCs;
 
 	//Assign IP addresses to the net devices specified in the container 
 	//based on the current network prefix and address base
-	this->routerIFC = this->routerIP.Assign(this->routerDevices);
+	routerIFC = routerIP.Assign(routerDevices);
 
-	for (int i = 0; i < this->numSender; ++i) {
+	for(uint i = 0; i < numSender; ++i) {
 		NetDeviceContainer senderDevice;
-		senderDevice.Add(this->senderDevices.Get(i));
-		senderDevice.Add(this->leftRouterDevices.Get(i));
-		Ipv4InterfaceContainer senderIFC = this->senderIP.Assign(senderDevice);
-		this->senderIFCs.Add(senderIFC.Get(0));
-		this->leftRouterIFCs.Add(senderIFC.Get(1));
+		senderDevice.Add(senderDevices.Get(i));
+		senderDevice.Add(leftRouterDevices.Get(i));
+		Ipv4InterfaceContainer senderIFC = senderIP.Assign(senderDevice);
+		senderIFCs.Add(senderIFC.Get(0));
+		leftRouterIFCs.Add(senderIFC.Get(1));
 		//Increment the network number and reset the IP address counter 
 		//to the base value provided in the SetBase method.
-		this->senderIP.NewNetwork();
+		senderIP.NewNetwork();
 
 		NetDeviceContainer receiverDevice;
-		receiverDevice.Add(this->receiverDevices.Get(i));
-		receiverDevice.Add(this->rightRouterDevices.Get(i));
-		Ipv4InterfaceContainer receiverIFC = this->receiverIP.Assign(receiverDevice);
-		this->receiverIFCs.Add(receiverIFC.Get(0));
-		this->rightRouterIFCs.Add(receiverIFC.Get(1));
-		this->receiverIP.NewNetwork();
+		receiverDevice.Add(receiverDevices.Get(i));
+		receiverDevice.Add(rightRouterDevices.Get(i));
+		Ipv4InterfaceContainer receiverIFC = receiverIP.Assign(receiverDevice);
+		receiverIFCs.Add(receiverIFC.Get(0));
+		rightRouterIFCs.Add(receiverIFC.Get(1));
+		receiverIP.NewNetwork();
 	}
-}
-
-void partAC() {
-	std::cout << "Part A started..." << std::endl;
-
-	TopologyParam topologyParams;
-	DumbbellTopology dumbbellTopology;
-
-	dumbbellTopology.setConnections(topologyParams);
-	dumbbellTopology.setErrorRate(topologyParams);
-	dumbbellTopology.createNodes(topologyParams);
-	dumbbellTopology.setNetDevices(topologyParams);
-	dumbbellTopology.installInternetStack(topologyParams);
-	dumbbellTopology.addIpAddrToNodes(topologyParams);
-	dumbbellTopology.addIpAddrToNetDevices(topologyParams);
 
 	/*
 		Measuring Performance of each TCP variant
@@ -449,8 +417,8 @@ void partAC() {
 	********************************************************************/
 	double durationGap = 100;
 	double netDuration = 0;
-	int port = 9000;
-	int numPackets = 10000000;
+	uint port = 9000;
+	uint numPackets = 10000000;
 	std::string transferSpeed = "400Mbps";	
 
 	//TCP Reno from H1 to H4
@@ -503,8 +471,8 @@ void partAC() {
 	Config::Connect(sink_, MakeBoundCallback(&ReceivedPacketIPV4, stream3TP, netDuration));
 	netDuration += durationGap;
 
-	//pointToPointRouter.EnablePcapAll("application_6__a");
-	//pointToPointLeaf.EnablePcapAll("application_6_RR_a");
+	//p2pHR.EnablePcapAll("application_6__a");
+	//p2pRR.EnablePcapAll("application_6_RR_a");
 
 	//Turning on Static Global Routing
 	Ipv4GlobalRoutingHelper::PopulateRoutingTables();
@@ -562,27 +530,98 @@ void partAC() {
 
 
 void partBC() {
+	std::cout << "Part B started..." << std::endl;
+	std::string rateHR = "100Mbps";
+	std::string latencyHR = "20ms";
+	std::string rateRR = "10Mbps";
+	std::string latencyRR = "50ms";
 
-	/*
-	 *	Initialize constraints : Bandwidth-delay, #hosts, DropTailQueue
-	 * */
-	
-	TopologyParam topologyParams;
+	uint packetSize = 1.2*1024;		//1.2KB
+	uint queueSizeHR = (100000*20)/packetSize;
+	uint queueSizeRR = (10000*50)/packetSize;
 
-	/*
-	 *	Create Dumbbell topology
-	 * */
-	DumbbellTopology dumbbellTopology;
+	uint numSender = 3;
+
+	double errorP = ERROR;
+
+
 	Config::SetDefault("ns3::DropTailQueue::Mode", StringValue("QUEUE_MODE_PACKETS"));
+    /*
+    Config::SetDefault("ns3::DropTailQueue::MaxPackets", UintegerValue(queuesize));
+	*/
 
-	dumbbellTopology.setConnections(topologyParams);
-	dumbbellTopology.setErrorRate(topologyParams);
-	dumbbellTopology.createNodes(topologyParams);
-	dumbbellTopology.setNetDevices(topologyParams);
-	dumbbellTopology.installInternetStack(topologyParams);
-	dumbbellTopology.addIpAddrToNodes(topologyParams);
-	dumbbellTopology.addIpAddrToNetDevices(topologyParams);
+	//Creating channel without IP address
+	std::cout << "Creating channel without IP address" << std::endl;
+	PointToPointHelper p2pHR, p2pRR;
+	p2pHR.SetDeviceAttribute("DataRate", StringValue(rateHR));
+	p2pHR.SetChannelAttribute("Delay", StringValue(latencyHR));
+	p2pHR.SetQueue("ns3::DropTailQueue", "MaxPackets", UintegerValue(queueSizeHR));
+	p2pRR.SetDeviceAttribute("DataRate", StringValue(rateRR));
+	p2pRR.SetChannelAttribute("Delay", StringValue(latencyRR));
+	p2pRR.SetQueue("ns3::DropTailQueue", "MaxPackets", UintegerValue(queueSizeRR));
+
+	//Adding some errorrate
+	std::cout << "Adding some errorrate" << std::endl;
+	Ptr<RateErrorModel> em = CreateObjectWithAttributes<RateErrorModel> ("ErrorRate", DoubleValue (errorP));
+
+	NodeContainer routers, senders, receivers;
+	routers.Create(2);
+	senders.Create(numSender);
+	receivers.Create(numSender);
+
+	NetDeviceContainer routerDevices = p2pRR.Install(routers);
+	NetDeviceContainer leftRouterDevices, rightRouterDevices, senderDevices, receiverDevices;
+
+	//Adding links
+	std::cout << "Adding links" << std::endl;
+	for(uint i = 0; i < numSender; ++i) {
+		NetDeviceContainer cleft = p2pHR.Install(routers.Get(0), senders.Get(i));
+		leftRouterDevices.Add(cleft.Get(0));
+		senderDevices.Add(cleft.Get(1));
+		cleft.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(em));
+
+		NetDeviceContainer cright = p2pHR.Install(routers.Get(1), receivers.Get(i));
+		rightRouterDevices.Add(cright.Get(0));
+		receiverDevices.Add(cright.Get(1));
+		cright.Get(0)->SetAttribute("ReceiveErrorModel", PointerValue(em));
+	}
+
+	//Install Internet Stack
+	std::cout << "Install Internet Stack" << std::endl;
+	InternetStackHelper stack;
+	stack.Install(routers);
+	stack.Install(senders);
+	stack.Install(receivers);
+
+
+	//Adding IP addresses
+	std::cout << "Adding IP addresses" << std::endl;
+	Ipv4AddressHelper routerIP = Ipv4AddressHelper("10.3.0.0", "255.255.255.0");
+	Ipv4AddressHelper senderIP = Ipv4AddressHelper("10.1.0.0", "255.255.255.0");
+	Ipv4AddressHelper receiverIP = Ipv4AddressHelper("10.2.0.0", "255.255.255.0");
 	
+
+	Ipv4InterfaceContainer routerIFC, senderIFCs, receiverIFCs, leftRouterIFCs, rightRouterIFCs;
+
+	routerIFC = routerIP.Assign(routerDevices);
+
+	for(uint i = 0; i < numSender; ++i) {
+		NetDeviceContainer senderDevice;
+		senderDevice.Add(senderDevices.Get(i));
+		senderDevice.Add(leftRouterDevices.Get(i));
+		Ipv4InterfaceContainer senderIFC = senderIP.Assign(senderDevice);
+		senderIFCs.Add(senderIFC.Get(0));
+		leftRouterIFCs.Add(senderIFC.Get(1));
+		senderIP.NewNetwork();
+
+		NetDeviceContainer receiverDevice;
+		receiverDevice.Add(receiverDevices.Get(i));
+		receiverDevice.Add(rightRouterDevices.Get(i));
+		Ipv4InterfaceContainer receiverIFC = receiverIP.Assign(receiverDevice);
+		receiverIFCs.Add(receiverIFC.Get(0));
+		rightRouterIFCs.Add(receiverIFC.Get(1));
+		receiverIP.NewNetwork();
+	}
 	/********************************************************************
 	PART (b)
 	********************************************************************/
@@ -594,8 +633,8 @@ void partBC() {
 	double durationGap = 100;
 	double oneFlowStart = 0;
 	double otherFlowStart = 20;
-	int port = 9000;
-	int numPackets = 10000000;
+	uint port = 9000;
+	uint numPackets = 10000000;
 	std::string transferSpeed = "400Mbps";
 		
 	
@@ -646,8 +685,8 @@ void partBC() {
 	sink_ = "/NodeList/7/$ns3::Ipv4L3Protocol/Rx";
 	Config::Connect(sink_, MakeBoundCallback(&ReceivedPacketIPV4, stream3TP, 0));
 
-	//pointToPointRouter.EnablePcapAll("application_6_HR_a");
-	//pointToPointLeaf.EnablePcapAll("application_6_RR_a");
+	//p2pHR.EnablePcapAll("application_6_HR_a");
+	//p2pRR.EnablePcapAll("application_6_RR_a");
 
 	//Turning on Static Global Routing
 	std::cout << "Turning on Static Global Routing" << std::endl;
